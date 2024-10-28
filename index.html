@@ -41,6 +41,26 @@
         h1 {
             margin-bottom: 10px;
         }
+        #results {
+            margin-top: 20px;
+            padding: 10px;
+            border: 2px solid #4CAF50;
+            border-radius: 8px;
+            background-color: #fff;
+            max-width: 600px;
+            width: 100%;
+        }
+        #results h2 {
+            margin: 0;
+            color: #4CAF50;
+        }
+        #results ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        #results li {
+            margin: 5px 0;
+        }
     </style>
 </head>
 <body>
@@ -50,6 +70,11 @@
 <video id="videoInput" autoplay playsinline></video>
 <canvas id="canvasOutput"></canvas>
 
+<div id="results">
+    <h2>Detected Objects:</h2>
+    <ul id="objectList"></ul>
+</div>
+
 <!-- TensorFlow.js Library -->
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
@@ -58,6 +83,7 @@
     const video = document.getElementById('videoInput');
     const canvas = document.getElementById('canvasOutput');
     const ctx = canvas.getContext('2d');
+    const objectList = document.getElementById('objectList');
     let model;
 
     // Start the camera
@@ -95,6 +121,7 @@
         // Detect objects in the captured image
         const predictions = await model.detect(canvas);
         drawPredictions(predictions);
+        displayDetectedObjects(predictions);
     }
 
     // Draw predictions on the canvas
@@ -111,6 +138,16 @@
             ctx.fillStyle = 'red';
             ctx.stroke();
             ctx.fillText(`${prediction.class} (${Math.round(prediction.score * 100)}%)`, prediction.bbox[0], prediction.bbox[1] > 10 ? prediction.bbox[1] - 5 : 10);
+        });
+    }
+
+    // Display detected objects in the results section
+    function displayDetectedObjects(predictions) {
+        objectList.innerHTML = ''; // Clear previous results
+        predictions.forEach(prediction => {
+            const li = document.createElement('li');
+            li.textContent = `${prediction.class} (${Math.round(prediction.score * 100)}%)`;
+            objectList.appendChild(li);
         });
     }
 
