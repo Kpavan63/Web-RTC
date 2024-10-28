@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Object Detection with TensorFlow.js</title>
+    <title>Object Identification with TensorFlow.js</title>
     <style>
         body {
             display: flex;
@@ -40,8 +40,8 @@
 </head>
 <body>
 
-<h1>Object Detection with TensorFlow.js</h1>
-<button class="btn" onclick="toggleCamera()">Switch Camera</button>
+<h1>Object Identification with TensorFlow.js</h1>
+<button class="btn" id="takePhotoButton">Take Photo</button>
 <video id="videoInput" autoplay playsinline></video>
 <canvas id="canvasOutput"></canvas>
 
@@ -53,15 +53,14 @@
     let video = document.getElementById('videoInput');
     let canvas = document.getElementById('canvasOutput');
     let ctx = canvas.getContext('2d');
-    let useFrontCamera = true;
-    let videoStream;
     let model;
+    let videoStream;
 
     // Function to start the camera
     async function startCamera() {
         const constraints = {
             video: {
-                facingMode: useFrontCamera ? 'user' : 'environment',
+                facingMode: 'environment',
                 width: { ideal: 1280 },
                 height: { ideal: 720 }
             }
@@ -74,7 +73,6 @@
                 console.log('Video metadata loaded');
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
-                detectObjects();
             };
         } catch (error) {
             console.error('Error accessing camera:', error);
@@ -82,31 +80,27 @@
         }
     }
 
-    // Function to toggle between front and back cameras
-    function toggleCamera() {
-        useFrontCamera = !useFrontCamera;
-        if (videoStream) {
-            videoStream.getTracks().forEach(track => track.stop()); // Stop previous stream
+    // Function to take a photo and identify objects
+    async function takePhoto() {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+        // Load the COCO-SSD model
+        if (!model) {
+            model = await cocoSsd.load();
+            console.log('Model loaded');
         }
-        startCamera();
-    }
 
-    // Function to detect objects in the video stream
-    async function detectObjects() {
-        model = await cocoSsd.load();
-        console.log('Model loaded');
-
-        const detect = async () => {
-            const predictions = await model.detect(video);
-            drawPredictions(predictions);
-            requestAnimationFrame(detect);
-        };
-        detect(); // Start detection
+        // Detect objects in the captured image
+        const predictions = await model.detect(image);
+        drawPredictions(predictions);
     }
 
     // Function to draw bounding boxes and labels on the canvas
     function drawPredictions(predictions) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height); // Redraw the video frame
+
         predictions.forEach(prediction => {
             // Draw bounding box
             ctx.beginPath();
@@ -119,8 +113,11 @@
         });
     }
 
-    // Initialize the camera when the page loads
-    document.addEventListener('DOMContentLoaded', startCamera);
+    // Initialize the camera and setup event listeners
+    document.addEventListener('DOMContentLoaded', () => {
+        startCamera();
+        document.getElementById('takePhotoButton').addEventListener('click', takePhoto);
+    });
 </script>
 
 </body>
