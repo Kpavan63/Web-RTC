@@ -3,40 +3,69 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Open Camera Example</title>
+  <title>Camera Access Example with JS Libraries</title>
   <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: Arial, sans-serif;
+      height: 100vh;
+    }
     #camera-stream {
       width: 100%;
       max-width: 600px;
       border: 2px solid #4CAF50;
       border-radius: 8px;
+      margin-top: 20px;
+    }
+    .btn {
+      padding: 10px 20px;
+      margin-top: 20px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+      border-radius: 5px;
     }
   </style>
 </head>
 <body>
 
-  <h1>Open Camera</h1>
-  <button onclick="openCamera()">Start Camera</button>
-  <video id="camera-stream" autoplay></video>
+  <h1>Camera Access</h1>
+  <button class="btn" onclick="startCamera()">Start Camera</button>
+  <video id="camera-stream" autoplay playsinline></video>
+
+  <!-- Load JavaScript Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ml5/0.6.0/ml5.min.js"></script>
 
   <script>
-    function openCamera() {
-      // Check if the browser supports the mediaDevices API
+    function startCamera() {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         navigator.mediaDevices.getUserMedia({ video: true })
           .then(function(stream) {
             const video = document.getElementById('camera-stream');
-            video.srcObject = stream;  // Set the video source to the camera stream
+            video.srcObject = stream;
           })
           .catch(function(error) {
-            console.error("Error accessing the camera: ", error);
-            alert("Camera access is not supported or permission denied.");
+            console.error("Camera access denied or not supported.", error);
+            alert("Unable to access the camera. Please check permissions.");
           });
       } else {
-        alert("Camera not supported by this browser.");
+        alert("Camera access is not supported in this browser.");
       }
     }
-  </script>
 
+    // Additional example with ml5.js
+    // Load a pre-trained image classifier model from ml5.js
+    function classifyImage() {
+      const classifier = ml5.imageClassifier('MobileNet', function() {
+        console.log("Model Loaded!");
+      });
+      // Use the camera stream to classify the image when ready
+    }
+  </script>
 </body>
 </html>
