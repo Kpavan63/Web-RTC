@@ -61,6 +61,12 @@
         #results li {
             margin: 5px 0;
         }
+        #photoTakenIcon {
+            display: none; /* Hide icon initially */
+            width: 50px; /* Icon size */
+            height: 50px; /* Icon size */
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
@@ -75,6 +81,9 @@
     <ul id="objectList"></ul>
 </div>
 
+<!-- Photo Taken Icon -->
+<img id="photoTakenIcon" src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Camera_icon_%28shutter%29.svg/1024px-Camera_icon_%28shutter%29.svg.png" alt="Photo Taken" />
+
 <!-- TensorFlow.js Library -->
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
@@ -84,6 +93,7 @@
     const canvas = document.getElementById('canvasOutput');
     const ctx = canvas.getContext('2d');
     const objectList = document.getElementById('objectList');
+    const photoTakenIcon = document.getElementById('photoTakenIcon');
     let model;
 
     // Start the camera
@@ -122,6 +132,12 @@
         const predictions = await model.detect(canvas);
         drawPredictions(predictions);
         displayDetectedObjects(predictions);
+
+        // Show the photo taken icon
+        photoTakenIcon.style.display = 'block'; // Show icon
+        setTimeout(() => {
+            photoTakenIcon.style.display = 'none'; // Hide icon after a few seconds
+        }, 2000); // Adjust time as needed
     }
 
     // Draw predictions on the canvas
