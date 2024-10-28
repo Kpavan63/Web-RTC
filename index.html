@@ -66,6 +66,7 @@
             video.srcObject = videoStream;
             video.play();
             video.onloadedmetadata = () => {
+                console.log('Video metadata loaded');
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
                 processVideo();
@@ -88,11 +89,19 @@
     // Function to process video frames for color detection
     function processVideo() {
         const src = new cv.Mat(video.height, video.width, cv.CV_8UC4);
-        const dst = new cv.Mat(video.height, video.width, cv.CV_8UC1);
+        const dst = new cv.Mat(video.height, video.width, cv.CV_8UC3);
         const cap = new cv.VideoCapture(video);
 
         function detectColor() {
             cap.read(src);
+
+            // Check if src is empty
+            if (src.empty()) {
+                console.error('Empty frame received from video capture');
+                requestAnimationFrame(detectColor);
+                return;
+            }
+
             cv.cvtColor(src, dst, cv.COLOR_RGBA2RGB);
 
             // Convert to HSV and apply color threshold (example for red color)
