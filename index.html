@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Open Camera Example</title>
+  <style>
+    #camera-stream {
+      width: 100%;
+      max-width: 600px;
+      border: 2px solid #4CAF50;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Open Camera</h1>
+  <button onclick="openCamera()">Start Camera</button>
+  <video id="camera-stream" autoplay></video>
+
+  <script>
+    function openCamera() {
+      // Check if the browser supports the mediaDevices API
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ video: true })
+          .then(function(stream) {
+            const video = document.getElementById('camera-stream');
+            video.srcObject = stream;  // Set the video source to the camera stream
+          })
+          .catch(function(error) {
+            console.error("Error accessing the camera: ", error);
+            alert("Camera access is not supported or permission denied.");
+          });
+      } else {
+        alert("Camera not supported by this browser.");
+      }
+    }
+  </script>
+
+</body>
+</html>
