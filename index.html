@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Object Identification with TensorFlow.js</title>
+    <title>Object Detection with TensorFlow.js</title>
     <style>
         body {
             display: flex;
@@ -13,6 +13,7 @@
             font-family: Arial, sans-serif;
             height: 100vh;
             margin: 0;
+            background-color: #f4f4f4;
         }
         video {
             border: 2px solid #4CAF50;
@@ -25,7 +26,7 @@
             position: absolute;
             top: 0;
             left: 0;
-            z-index: 9;
+            z-index: 10;
         }
         .btn {
             padding: 10px 20px;
@@ -35,12 +36,16 @@
             border: none;
             cursor: pointer;
             border-radius: 5px;
+            font-size: 16px;
+        }
+        h1 {
+            margin-bottom: 10px;
         }
     </style>
 </head>
 <body>
 
-<h1>Object Identification with TensorFlow.js</h1>
+<h1>Object Detection with TensorFlow.js</h1>
 <button class="btn" id="takePhotoButton">Take Photo</button>
 <video id="videoInput" autoplay playsinline></video>
 <canvas id="canvasOutput"></canvas>
@@ -50,53 +55,49 @@
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 
 <script>
-    let video = document.getElementById('videoInput');
-    let canvas = document.getElementById('canvasOutput');
-    let ctx = canvas.getContext('2d');
+    const video = document.getElementById('videoInput');
+    const canvas = document.getElementById('canvasOutput');
+    const ctx = canvas.getContext('2d');
     let model;
-    let videoStream;
 
-    // Function to start the camera
+    // Start the camera
     async function startCamera() {
         const constraints = {
             video: {
-                facingMode: 'environment',
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
+                facingMode: 'environment', // Use 'user' for front camera
             }
         };
         try {
-            videoStream = await navigator.mediaDevices.getUserMedia(constraints);
-            video.srcObject = videoStream;
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            video.srcObject = stream;
             video.play();
-            video.onloadedmetadata = () => {
-                console.log('Video metadata loaded');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-            };
         } catch (error) {
-            console.error('Error accessing camera:', error);
+            console.error('Error accessing the camera:', error);
             alert('Unable to access the camera. Please check permissions.');
         }
     }
 
-    // Function to take a photo and identify objects
+    // Take a photo and detect objects
     async function takePhoto() {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        // Set canvas size to match video
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
 
-        // Load the COCO-SSD model
+        // Draw the video frame to the canvas
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Load the model if not already loaded
         if (!model) {
             model = await cocoSsd.load();
             console.log('Model loaded');
         }
 
         // Detect objects in the captured image
-        const predictions = await model.detect(image);
+        const predictions = await model.detect(canvas);
         drawPredictions(predictions);
     }
 
-    // Function to draw bounding boxes and labels on the canvas
+    // Draw predictions on the canvas
     function drawPredictions(predictions) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height); // Redraw the video frame
@@ -116,7 +117,10 @@
     // Initialize the camera and setup event listeners
     document.addEventListener('DOMContentLoaded', () => {
         startCamera();
-        document.getElementById('takePhotoButton').addEventListener('click', takePhoto);
+        document.getElementById('takePhotoButton').addEventListener('click', () => {
+            console.log('Take Photo button clicked');
+            takePhoto();
+        });
     });
 </script>
 
