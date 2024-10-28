@@ -73,6 +73,13 @@
 <header>Food AI Assistant</header>
 
 <div class="container">
+    <label for="languageSelect">Select Language for Voice Instructions:</label>
+    <select id="languageSelect" class="btn">
+        <option value="en-US">English</option>
+        <option value="te-IN">Telugu</option>
+        <option value="hi-IN">Hindi</option>
+    </select>
+    
     <button class="btn" id="takePhotoButton">Take Photo</button>
     <video id="videoInput" autoplay playsinline></video>
     <canvas id="canvasOutput"></canvas>
@@ -99,6 +106,7 @@
     const recipeList = document.getElementById('recipeList');
     const instructionList = document.getElementById('instructionList');
     const recipeInstructionsDiv = document.getElementById('recipeInstructions');
+    const languageSelect = document.getElementById('languageSelect');
     let objectDetector;
 
     // Sample recipe data with instructions
@@ -165,11 +173,17 @@
     }
 
     function speakInstructions() {
+        const selectedLanguage = languageSelect.value;
         const utterance = new SpeechSynthesisUtterance();
-        utterance.lang = "en-US";
+        utterance.lang = selectedLanguage;
+        utterance.rate = 1;  // Control the speed for smoother pronunciation
+        utterance.pitch = 1;  // Control pitch for more natural voice
+        utterance.volume = 0.8;  // Slightly reduce volume for a softer voice
+        
         instructionList.querySelectorAll('li').forEach(step => {
             utterance.text += `${step.textContent}. `;
         });
+        
         speechSynthesis.speak(utterance);
     }
 
