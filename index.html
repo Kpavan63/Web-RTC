@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Object Detection with TensorFlow.js</title>
+    <title>Object Detection with ml5.js</title>
     <style>
         body {
             display: flex;
@@ -71,7 +71,7 @@
 </head>
 <body>
 
-<h1>Object Detection with TensorFlow.js</h1>
+<h1>Object Detection with ml5.js</h1>
 <button class="btn" id="takePhotoButton">Take Photo</button>
 <video id="videoInput" autoplay playsinline></video>
 <canvas id="canvasOutput"></canvas>
@@ -84,9 +84,8 @@
 <!-- Photo Taken Icon -->
 <img id="photoTakenIcon" src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Camera_icon_%28shutter%29.svg/1024px-Camera_icon_%28shutter%29.svg.png" alt="Photo Taken" />
 
-<!-- TensorFlow.js Library -->
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+<!-- ml5.js Library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ml5/0.6.0/ml5.min.js"></script>
 
 <script>
     const video = document.getElementById('videoInput');
@@ -94,7 +93,8 @@
     const ctx = canvas.getContext('2d');
     const objectList = document.getElementById('objectList');
     const photoTakenIcon = document.getElementById('photoTakenIcon');
-    let model;
+    let objectDetector;
+    let modelReady = false;
 
     // Start the camera
     async function startCamera() {
@@ -113,6 +113,17 @@
         }
     }
 
+    // Initialize the object detection model
+    function setupObjectDetector() {
+        objectDetector = ml5.objectDetector('cocossd', modelLoaded);
+    }
+
+    // Callback when model is loaded
+    function modelLoaded() {
+        console.log('Model Loaded!');
+        modelReady = true;
+    }
+
     // Take a photo and detect objects
     async function takePhoto() {
         // Set canvas size to match video
@@ -122,22 +133,26 @@
         // Draw the video frame to the canvas
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        // Load the model if not already loaded
-        if (!model) {
-            model = await cocoSsd.load();
-            console.log('Model loaded');
-        }
-
         // Detect objects in the captured image
-        const predictions = await model.detect(canvas);
-        drawPredictions(predictions);
-        displayDetectedObjects(predictions);
+        if (modelReady) {
+            objectDetector.detect(canvas, gotResults);
+        }
 
         // Show the photo taken icon
         photoTakenIcon.style.display = 'block'; // Show icon
         setTimeout(() => {
             photoTakenIcon.style.display = 'none'; // Hide icon after a few seconds
         }, 2000); // Adjust time as needed
+    }
+
+    // Callback with results from the object detection
+    function gotResults(error, results) {
+        if (error) {
+            console.error(error);
+            return;
+        }
+        drawPredictions(results);
+        displayDetectedObjects(results);
     }
 
     // Draw predictions on the canvas
@@ -148,12 +163,12 @@
         predictions.forEach(prediction => {
             // Draw bounding box
             ctx.beginPath();
-            ctx.rect(...prediction.bbox);
+            ctx.rect(...prediction.boundingBox);
             ctx.lineWidth = 2;
             ctx.strokeStyle = 'red';
             ctx.fillStyle = 'red';
             ctx.stroke();
-            ctx.fillText(`${prediction.class} (${Math.round(prediction.score * 100)}%)`, prediction.bbox[0], prediction.bbox[1] > 10 ? prediction.bbox[1] - 5 : 10);
+            ctx.fillText(`${prediction.label} (${Math.round(prediction.confidence * 100)}%)`, prediction.boundingBox[0], prediction.boundingBox[1] > 10 ? prediction.boundingBox[1] - 5 : 10);
         });
     }
 
@@ -162,7 +177,7 @@
         objectList.innerHTML = ''; // Clear previous results
         predictions.forEach(prediction => {
             const li = document.createElement('li');
-            li.textContent = `${prediction.class} (${Math.round(prediction.score * 100)}%)`;
+            li.textContent = `${prediction.label} (${Math.round(prediction.confidence * 100)}%)`;
             objectList.appendChild(li);
         });
     }
@@ -170,6 +185,7 @@
     // Initialize the camera and setup event listeners
     document.addEventListener('DOMContentLoaded', () => {
         startCamera();
+        setupObjectDetector();
         document.getElementById('takePhotoButton').addEventListener('click', () => {
             console.log('Take Photo button clicked');
             takePhoto();
