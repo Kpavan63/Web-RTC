@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Object Detection Camera</title>
+  <title>Object Detection with MediaPipe</title>
   <style>
     body {
       display: flex;
@@ -42,21 +42,26 @@
   <video id="camera-stream" autoplay playsinline></video>
   <div id="result">Detected Object: <span id="object-name">None</span></div>
 
-  <!-- Load TensorFlow.js Library -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-  <!-- Load COCO-SSD Model -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+  <!-- Load MediaPipe Library -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/objectron"></script>
 
   <script>
     let videoStream;
     let useFrontCamera = true;
-    let model;
+    let objectron;
 
-    // Load the COCO-SSD model from TensorFlow.js
     async function loadModel() {
-      model = await cocoSsd.load();
+      objectron = new Objectron({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/objectron/${file}`
+      });
+      objectron.setOptions({
+        modelComplexity: 1,
+        maxNumObjects: 5,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+      });
+      objectron.onResults(onResults);
       console.log("Model Loaded!");
-      detectObjects(); // Start object detection once the model is loaded
     }
 
     // Toggle between front and back cameras
@@ -68,7 +73,7 @@
     // Start the camera and display the video stream
     async function startCamera() {
       if (videoStream) {
-        videoStream.getTracks().forEach(track => track.stop()); // Stop any existing stream
+        videoStream.getTracks().forEach(track => track.stop());
       }
       const constraints = {
         video: {
@@ -79,27 +84,26 @@
         videoStream = await navigator.mediaDevices.getUserMedia(constraints);
         const video = document.getElementById('camera-stream');
         video.srcObject = videoStream;
+
+        // Feed video to MediaPipe for object detection
+        video.onloadeddata = () => {
+          objectron.send({ image: video });
+        };
       } catch (error) {
         console.error("Error accessing camera:", error);
         alert("Unable to access the camera. Please check permissions.");
       }
     }
 
-    // Detect objects in the video stream using COCO-SSD
-    async function detectObjects() {
-      const video = document.getElementById('camera-stream');
-      if (model && video) {
-        model.detect(video).then(predictions => {
-          if (predictions.length > 0) {
-            // Show the name of the first detected object
-            document.getElementById('object-name').innerText = predictions[0].class;
-          } else {
-            document.getElementById('object-name').innerText = "None";
-          }
-          // Call detectObjects again to continue detecting
-          requestAnimationFrame(detectObjects);
-        });
+    // Handle detection results from MediaPipe
+    function onResults(results) {
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        document.getElementById('object-name').innerText = "Object Detected!";
+      } else {
+        document.getElementById('object-name').innerText = "None";
       }
+      // Loop detection
+      requestAnimationFrame(() => objectron.send({ image: document.getElementById('camera-stream') }));
     }
 
     // Load the model and start the camera
