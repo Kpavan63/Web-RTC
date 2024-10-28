@@ -63,9 +63,15 @@
         }
         #photoTakenIcon {
             display: none; /* Hide icon initially */
-            width: 50px; /* Icon size */
-            height: 50px; /* Icon size */
+            align-items: center;
+            gap: 8px;
+            color: #4CAF50;
+            font-size: 18px;
             margin-top: 10px;
+        }
+        #photoTakenIcon svg {
+            width: 24px;
+            height: 24px;
         }
     </style>
 </head>
@@ -81,8 +87,14 @@
     <ul id="objectList"></ul>
 </div>
 
-<!-- Photo Taken Icon -->
-<img id="photoTakenIcon" src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Camera_icon_%28shutter%29.svg/1024px-Camera_icon_%28shutter%29.svg.png" alt="Photo Taken" />
+<!-- Photo Taken Notification -->
+<div id="photoTakenIcon">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <path d="M12 8v4l2 2"></path>
+    </svg>
+    <span>Photo Taken!</span>
+</div>
 
 <!-- TensorFlow.js and COCO-SSD Library -->
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
@@ -133,11 +145,11 @@
         drawPredictions(predictions);
         displayDetectedObjects(predictions);
 
-        // Show the photo taken icon
-        photoTakenIcon.style.display = 'block'; // Show icon
+        // Show the photo taken notification
+        photoTakenIcon.style.display = 'flex'; // Show icon and text
         setTimeout(() => {
-            photoTakenIcon.style.display = 'none'; // Hide icon after a few seconds
-        }, 2000); // Adjust time as needed
+            photoTakenIcon.style.display = 'none'; // Hide after 2 seconds
+        }, 2000);
     }
 
     // Draw predictions on the canvas
