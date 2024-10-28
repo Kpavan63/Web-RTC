@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Camera with Object Detection</title>
+  <title>Object Detection Camera</title>
   <style>
     body {
       display: flex;
@@ -42,20 +42,21 @@
   <video id="camera-stream" autoplay playsinline></video>
   <div id="result">Detected Object: <span id="object-name">None</span></div>
 
-  <!-- Load ml5.js -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/ml5/0.6.0/ml5.min.js"></script>
+  <!-- Load TensorFlow.js Library -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <!-- Load COCO-SSD Model -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 
   <script>
     let videoStream;
     let useFrontCamera = true;
-    let classifier;
+    let model;
 
-    // Load the image classifier model from ml5
-    function loadClassifier() {
-      classifier = ml5.imageClassifier('MobileNet', () => {
-        console.log("Model Loaded!");
-        identifyObject(); // Start identifying objects once the model is loaded
-      });
+    // Load the COCO-SSD model from TensorFlow.js
+    async function loadModel() {
+      model = await cocoSsd.load();
+      console.log("Model Loaded!");
+      detectObjects(); // Start object detection once the model is loaded
     }
 
     // Toggle between front and back cameras
@@ -65,7 +66,7 @@
     }
 
     // Start the camera and display the video stream
-    function startCamera() {
+    async function startCamera() {
       if (videoStream) {
         videoStream.getTracks().forEach(track => track.stop()); // Stop any existing stream
       }
@@ -74,36 +75,35 @@
           facingMode: useFrontCamera ? "user" : "environment"
         }
       };
-      navigator.mediaDevices.getUserMedia(constraints)
-        .then(stream => {
-          videoStream = stream;
-          const video = document.getElementById('camera-stream');
-          video.srcObject = stream;
-        })
-        .catch(error => {
-          console.error("Error accessing camera:", error);
-          alert("Unable to access the camera. Please check permissions.");
-        });
+      try {
+        videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+        const video = document.getElementById('camera-stream');
+        video.srcObject = videoStream;
+      } catch (error) {
+        console.error("Error accessing camera:", error);
+        alert("Unable to access the camera. Please check permissions.");
+      }
     }
 
-    // Identify objects in the video stream
-    function identifyObject() {
+    // Detect objects in the video stream using COCO-SSD
+    async function detectObjects() {
       const video = document.getElementById('camera-stream');
-      if (classifier && video) {
-        classifier.classify(video, (error, results) => {
-          if (error) {
-            console.error(error);
-            return;
+      if (model && video) {
+        model.detect(video).then(predictions => {
+          if (predictions.length > 0) {
+            // Show the name of the first detected object
+            document.getElementById('object-name').innerText = predictions[0].class;
+          } else {
+            document.getElementById('object-name').innerText = "None";
           }
-          document.getElementById('object-name').innerText = results[0].label;
-          // Call the identifyObject function again to keep classifying
-          identifyObject();
+          // Call detectObjects again to continue detecting
+          requestAnimationFrame(detectObjects);
         });
       }
     }
 
-    // Load the classifier and start the camera
-    loadClassifier();
+    // Load the model and start the camera
+    loadModel();
     startCamera();
   </script>
 
