@@ -11,6 +11,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            padding: 0;
             margin: 0;
         }
         header {
@@ -59,12 +60,15 @@
             color: #388e3c;
             margin-top: 0;
         }
-        #recipeList, #instructionList {
+        #objectList, #nutritionList, #recipeList, #historyList, #mealLog {
             list-style-type: none;
             padding: 0;
         }
-        #instructionList li {
-            margin-bottom: 10px;
+        #historyList li, #mealLog li {
+            display: inline-block;
+            margin-right: 10px;
+            font-size: 14px;
+            color: #333;
         }
     </style>
 </head>
@@ -73,26 +77,41 @@
 <header>Food AI Assistant</header>
 
 <div class="container">
-    <label for="languageSelect">Select Language for Voice Instructions:</label>
     <select id="languageSelect" class="btn">
-        <option value="en-US">English</option>
-        <option value="te-IN">Telugu</option>
-        <option value="hi-IN">Hindi</option>
+        <option value="en">English</option>
+        <option value="es">Spanish</option>
+        <option value="fr">French</option>
     </select>
-    
     <button class="btn" id="takePhotoButton">Take Photo</button>
     <video id="videoInput" autoplay playsinline></video>
     <canvas id="canvasOutput"></canvas>
+
+    <div class="card" id="results">
+        <h2>Detected Objects</h2>
+        <ul id="objectList"></ul>
+    </div>
+
+    <div class="card" id="nutritionInfo">
+        <h2>Nutrition Information</h2>
+        <label>Serving Size:</label>
+        <input type="number" id="servingSize" value="1" min="1" style="width: 50px;">
+        <ul id="nutritionList"></ul>
+    </div>
 
     <div class="card" id="recipeSuggestions">
         <h2>Recipe Suggestions</h2>
         <ul id="recipeList"></ul>
     </div>
 
-    <div class="card" id="recipeInstructions" style="display:none;">
-        <h2>Recipe Instructions</h2>
-        <ul id="instructionList"></ul>
-        <button class="btn" id="speakInstructions">Read Instructions</button>
+    <div class="card" id="history">
+        <h2>Detection History</h2>
+        <ul id="historyList"></ul>
+    </div>
+
+    <div class="card" id="calorieTracker">
+        <h2>Meal Log & Calorie Tracker</h2>
+        <ul id="mealLog"></ul>
+        <p>Total Calories: <span id="totalCalories">0</span> kcal</p>
     </div>
 </div>
 
@@ -103,22 +122,24 @@
     const video = document.getElementById('videoInput');
     const canvas = document.getElementById('canvasOutput');
     const ctx = canvas.getContext('2d');
+    const objectList = document.getElementById('objectList');
+    const nutritionList = document.getElementById('nutritionList');
     const recipeList = document.getElementById('recipeList');
-    const instructionList = document.getElementById('instructionList');
-    const recipeInstructionsDiv = document.getElementById('recipeInstructions');
-    const languageSelect = document.getElementById('languageSelect');
+    const historyList = document.getElementById('historyList');
+    const mealLog = document.getElementById('mealLog');
+    const totalCalories = document.getElementById('totalCalories');
+    const servingSizeInput = document.getElementById('servingSize');
     let objectDetector;
+    let calorieCount = 0;
 
-    // Sample recipe data with instructions
+    const nutritionData = {
+        apple: {calories: 95, carbs: 25, fiber: 4, sugar: 19},
+        banana: {calories: 105, carbs: 27, fiber: 3, sugar: 14}
+    };
+
     const recipeData = {
-        apple: [
-            {name: "Apple Pie", instructions: ["Preheat oven to 180°C.", "Slice apples and add sugar.", "Fill pie crust with apples and bake for 45 mins."]},
-            {name: "Apple Smoothie", instructions: ["Add apple, milk, and ice to blender.", "Blend until smooth.", "Pour into glass and serve."]}
-        ],
-        banana: [
-            {name: "Banana Bread", instructions: ["Preheat oven to 180°C.", "Mash bananas and mix with flour.", "Bake mixture for 1 hour."]},
-            {name: "Banana Smoothie", instructions: ["Add banana, milk, and ice to blender.", "Blend until smooth.", "Pour into glass and serve."]}
-        ]
+        apple: [{name: "Apple Pie"}, {name: "Apple Smoothie"}],
+        banana: [{name: "Banana Bread"}, {name: "Banana Smoothie"}]
     };
 
     async function startCamera() {
@@ -141,7 +162,33 @@
         canvas.height = video.videoHeight;
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const predictions = await objectDetector.detect(canvas);
+        displayDetectedObjects(predictions);
+        displayNutritionInfo(predictions);
         suggestRecipes(predictions);
+        updateDetectionHistory(predictions);
+        updateCalorieTracker(predictions);
+    }
+
+    function displayDetectedObjects(predictions) {
+        objectList.innerHTML = '';
+        predictions.forEach(prediction => {
+            const li = document.createElement('li');
+            li.textContent = prediction.class;
+            objectList.appendChild(li);
+        });
+    }
+
+    function displayNutritionInfo(predictions) {
+        nutritionList.innerHTML = '';
+        const servingSize = parseFloat(servingSizeInput.value);
+        predictions.forEach(prediction => {
+            const nutrition = nutritionData[prediction.class.toLowerCase()];
+            if (nutrition) {
+                const li = document.createElement('li');
+                li.textContent = `${prediction.class}: Calories - ${nutrition.calories * servingSize}`;
+                nutritionList.appendChild(li);
+            }
+        });
     }
 
     function suggestRecipes(predictions) {
@@ -152,43 +199,31 @@
                 recipes.forEach(recipe => {
                     const li = document.createElement('li');
                     li.textContent = recipe.name;
-                    li.classList.add('recipe-item');
-                    li.dataset.instructions = JSON.stringify(recipe.instructions);
-                    li.addEventListener('click', showRecipeInstructions);
                     recipeList.appendChild(li);
                 });
             }
         });
     }
 
-    function showRecipeInstructions(event) {
-        const instructions = JSON.parse(event.target.dataset.instructions);
-        instructionList.innerHTML = '';
-        instructions.forEach(step => {
+    function updateDetectionHistory(predictions) {
+        predictions.forEach(prediction => {
             const li = document.createElement('li');
-            li.textContent = step;
-            instructionList.appendChild(li);
+            li.textContent = prediction.class;
+            historyList.appendChild(li);
         });
-        recipeInstructionsDiv.style.display = 'block';
     }
 
-    function speakInstructions() {
-        const selectedLanguage = languageSelect.value;
-        const utterance = new SpeechSynthesisUtterance();
-        utterance.lang = selectedLanguage;
-        utterance.rate = 1;  // Control the speed for smoother pronunciation
-        utterance.pitch = 1;  // Control pitch for more natural voice
-        utterance.volume = 0.8;  // Slightly reduce volume for a softer voice
-        
-        instructionList.querySelectorAll('li').forEach(step => {
-            utterance.text += `${step.textContent}. `;
+    function updateCalorieTracker(predictions) {
+        predictions.forEach(prediction => {
+            const nutrition = nutritionData[prediction.class.toLowerCase()];
+            if (nutrition) {
+                calorieCount += nutrition.calories;
+                totalCalories.textContent = calorieCount;
+            }
         });
-        
-        speechSynthesis.speak(utterance);
     }
 
     document.getElementById('takePhotoButton').addEventListener('click', takePhoto);
-    document.getElementById('speakInstructions').addEventListener('click', speakInstructions);
     startCamera();
     setupObjectDetector();
 </script>
