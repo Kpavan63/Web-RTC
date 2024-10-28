@@ -3,69 +3,105 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enhanced Food AI with Nutrition and Recipes</title>
+    <title>Food AI App</title>
     <style>
         body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f7ee;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            font-family: Arial, sans-serif;
-            height: 100vh;
+            padding: 0;
             margin: 0;
-            background-color: #e7f5e5;
+        }
+        header {
+            width: 100%;
+            padding: 10px 0;
+            background-color: #4CAF50;
+            color: white;
+            text-align: center;
+            font-size: 24px;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
         }
         video, canvas {
-            border-radius: 8px;
             width: 100%;
-            max-width: 600px;
+            border-radius: 12px;
+            border: 2px solid #4CAF50;
         }
         .btn {
             padding: 10px 20px;
-            margin-top: 10px;
             background-color: #4CAF50;
             color: white;
             border: none;
+            border-radius: 8px;
             cursor: pointer;
-            border-radius: 5px;
             font-size: 16px;
         }
-        #results, #nutritionInfo, #recipeSuggestions {
-            margin-top: 20px;
-            padding: 10px;
-            background-color: #fff;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            max-width: 600px;
+        .btn:hover {
+            background-color: #45a049;
+        }
+        .card {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 20px;
             width: 100%;
         }
-        h1, h2 {
+        h2 {
             color: #4CAF50;
+            margin-top: 0;
         }
-        ul {
+        #objectList, #nutritionList, #recipeList, #historyList {
             list-style-type: none;
             padding: 0;
+        }
+        #historyList li {
+            display: inline-block;
+            margin-right: 10px;
+            font-size: 14px;
+            color: #333;
         }
     </style>
 </head>
 <body>
 
-<h1>Enhanced Food AI with Nutrition & Recipes</h1>
-<button class="btn" id="takePhotoButton">Take Photo</button>
-<video id="videoInput" autoplay playsinline></video>
-<canvas id="canvasOutput"></canvas>
+<header>Food AI Assistant</header>
 
-<div id="results">
-    <h2>Detected Objects:</h2>
-    <ul id="objectList"></ul>
-</div>
-<div id="nutritionInfo">
-    <h2>Nutrition Information:</h2>
-    <ul id="nutritionList"></ul>
-</div>
-<div id="recipeSuggestions">
-    <h2>Recipe Suggestions:</h2>
-    <ul id="recipeList"></ul>
+<div class="container">
+    <button class="btn" id="takePhotoButton">Take Photo</button>
+    <video id="videoInput" autoplay playsinline></video>
+    <canvas id="canvasOutput"></canvas>
+
+    <div class="card" id="results">
+        <h2>Detected Objects</h2>
+        <ul id="objectList"></ul>
+    </div>
+
+    <div class="card" id="nutritionInfo">
+        <h2>Nutrition Information</h2>
+        <label>Serving Size:</label>
+        <input type="number" id="servingSize" value="1" min="1" style="width: 50px; margin-left: 10px;">
+        <ul id="nutritionList"></ul>
+    </div>
+
+    <div class="card" id="recipeSuggestions">
+        <h2>Recipe Suggestions</h2>
+        <ul id="recipeList"></ul>
+    </div>
+
+    <div class="card" id="history">
+        <h2>Detection History</h2>
+        <ul id="historyList"></ul>
+    </div>
 </div>
 
 <!-- TensorFlow.js and COCO-SSD Library -->
@@ -79,24 +115,31 @@
     const objectList = document.getElementById('objectList');
     const nutritionList = document.getElementById('nutritionList');
     const recipeList = document.getElementById('recipeList');
+    const historyList = document.getElementById('historyList');
+    const servingSizeInput = document.getElementById('servingSize');
     let objectDetector;
+    let detectionHistory = new Set();
 
-    // Placeholder nutrition and recipe data
+    // Placeholder data
     const nutritionData = {
-        apple: "Calories: 95, Carbs: 25g, Fiber: 4g, Sugar: 19g",
-        banana: "Calories: 105, Carbs: 27g, Fiber: 3g, Sugar: 14g"
+        apple: {calories: 95, carbs: 25, fiber: 4, sugar: 19},
+        banana: {calories: 105, carbs: 27, fiber: 3, sugar: 14}
     };
     const recipeData = {
-        apple: ["Apple Pie", "Apple Crumble", "Apple Salad"],
-        banana: ["Banana Bread", "Banana Smoothie", "Banana Pancakes"]
+        apple: [
+            {name: "Apple Pie", link: "https://example.com/apple-pie"},
+            {name: "Apple Crumble", link: "https://example.com/apple-crumble"}
+        ],
+        banana: [
+            {name: "Banana Bread", link: "https://example.com/banana-bread"},
+            {name: "Banana Smoothie", link: "https://example.com/banana-smoothie"}
+        ]
     };
 
     async function startCamera() {
-        const constraints = { video: { facingMode: 'environment' } };
         try {
-            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
             video.srcObject = stream;
-            video.play();
         } catch (error) {
             console.error('Error accessing the camera:', error);
             alert('Please enable camera permissions.');
@@ -112,27 +155,11 @@
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
         const predictions = await objectDetector.detect(canvas);
-        drawPredictions(predictions);
         displayDetectedObjects(predictions);
         displayNutritionInfo(predictions);
         suggestRecipes(predictions);
-    }
-
-    function drawPredictions(predictions) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        predictions.forEach(prediction => {
-            ctx.beginPath();
-            ctx.rect(prediction.bbox[0], prediction.bbox[1], prediction.bbox[2], prediction.bbox[3]);
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = 'green';
-            ctx.stroke();
-            ctx.fillStyle = 'green';
-            ctx.fillText(prediction.class, prediction.bbox[0], prediction.bbox[1] > 10 ? prediction.bbox[1] - 5 : 10);
-        });
+        updateDetectionHistory(predictions);
     }
 
     function displayDetectedObjects(predictions) {
@@ -146,11 +173,12 @@
 
     function displayNutritionInfo(predictions) {
         nutritionList.innerHTML = '';
+        const servingSize = parseFloat(servingSizeInput.value);
         predictions.forEach(prediction => {
             const nutrition = nutritionData[prediction.class.toLowerCase()];
             if (nutrition) {
                 const li = document.createElement('li');
-                li.textContent = `${prediction.class}: ${nutrition}`;
+                li.textContent = `${prediction.class}: Calories - ${nutrition.calories * servingSize}, Carbs - ${nutrition.carbs * servingSize}g, Fiber - ${nutrition.fiber * servingSize}g, Sugar - ${nutrition.sugar * servingSize}g`;
                 nutritionList.appendChild(li);
             }
         });
@@ -163,9 +191,24 @@
             if (recipes) {
                 recipes.forEach(recipe => {
                     const li = document.createElement('li');
-                    li.textContent = recipe;
+                    const link = document.createElement('a');
+                    link.href = recipe.link;
+                    link.target = "_blank";
+                    link.textContent = recipe.name;
+                    li.appendChild(link);
                     recipeList.appendChild(li);
                 });
+            }
+        });
+    }
+
+    function updateDetectionHistory(predictions) {
+        predictions.forEach(prediction => {
+            if (!detectionHistory.has(prediction.class)) {
+                detectionHistory.add(prediction.class);
+                const li = document.createElement('li');
+                li.textContent = prediction.class;
+                historyList.appendChild(li);
             }
         });
     }
