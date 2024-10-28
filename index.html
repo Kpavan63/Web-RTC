@@ -163,7 +163,7 @@
         predictions.forEach(prediction => {
             // Draw bounding box
             ctx.beginPath();
-            ctx.rect(...prediction.boundingBox);
+            ctx.rect(prediction.boundingBox[0], prediction.boundingBox[1], prediction.boundingBox[2], prediction.boundingBox[3]);
             ctx.lineWidth = 2;
             ctx.strokeStyle = 'red';
             ctx.fillStyle = 'red';
