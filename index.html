@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Color-Based Object Detection with OpenCV.js</title>
+    <title>Object Detection with TensorFlow.js</title>
     <style>
         body {
             display: flex;
@@ -14,16 +14,18 @@
             height: 100vh;
             margin: 0;
         }
-        #canvasOutput {
+        video {
             border: 2px solid #4CAF50;
             border-radius: 8px;
             margin-top: 20px;
             width: 100%;
             max-width: 600px;
-            height: auto;
         }
-        #videoInput {
-            display: none; /* Hide the video element */
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 9;
         }
         .btn {
             padding: 10px 20px;
@@ -38,13 +40,14 @@
 </head>
 <body>
 
-<h1>Color-Based Object Detection</h1>
+<h1>Object Detection with TensorFlow.js</h1>
 <button class="btn" onclick="toggleCamera()">Switch Camera</button>
 <video id="videoInput" autoplay playsinline></video>
 <canvas id="canvasOutput"></canvas>
 
-<!-- OpenCV.js Library -->
-<script async src="https://docs.opencv.org/4.x/opencv.js" type="text/javascript"></script>
+<!-- TensorFlow.js Library -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 
 <script>
     let video = document.getElementById('videoInput');
@@ -52,6 +55,7 @@
     let ctx = canvas.getContext('2d');
     let useFrontCamera = true;
     let videoStream;
+    let model;
 
     // Function to start the camera
     async function startCamera() {
@@ -70,7 +74,7 @@
                 console.log('Video metadata loaded');
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
-                processVideo();
+                detectObjects();
             };
         } catch (error) {
             console.error('Error accessing camera:', error);
@@ -87,61 +91,35 @@
         startCamera();
     }
 
-    // Function to process video frames for color detection
-    function processVideo() {
-        const src = new cv.Mat(video.height, video.width, cv.CV_8UC4);
-        const dst = new cv.Mat(video.height, video.width, cv.CV_8UC3);
-        const cap = new cv.VideoCapture(video);
+    // Function to detect objects in the video stream
+    async function detectObjects() {
+        model = await cocoSsd.load();
+        console.log('Model loaded');
 
-        function detectColor() {
-            cap.read(src);
-
-            // Check if src is empty
-            if (src.empty()) {
-                console.error('Empty frame received from video capture');
-                requestAnimationFrame(detectColor);
-                return;
-            }
-
-            cv.cvtColor(src, dst, cv.COLOR_RGBA2RGB);
-
-            // Convert to HSV and apply color threshold (example for red color)
-            cv.cvtColor(dst, dst, cv.COLOR_RGB2HSV);
-            const lower = new cv.Mat(dst.rows, dst.cols, dst.type(), [0, 150, 50, 0]); // Lower red
-            const upper = new cv.Mat(dst.rows, dst.cols, dst.type(), [10, 255, 255, 255]); // Upper red
-            const mask = new cv.Mat();
-            cv.inRange(dst, lower, upper, mask);
-
-            // Find contours of the object
-            const contours = new cv.MatVector();
-            const hierarchy = new cv.Mat();
-            cv.findContours(mask, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-
-            // Draw bounding boxes for each contour found
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            for (let i = 0; i < contours.size(); i++) {
-                const rect = cv.boundingRect(contours.get(i));
-                ctx.strokeStyle = "#FF0000";
-                ctx.lineWidth = 2;
-                ctx.strokeRect(rect.x, rect.y, rect.height, rect.height);
-                ctx.font = '16px Arial';
-                ctx.fillStyle = "#FF0000";
-                ctx.fillText('Detected', rect.x, rect.y > 10 ? rect.y - 5 : 10); // Label above the box
-            }
-
-            // Clean up
-            mask.delete();
-            contours.delete();
-            hierarchy.delete();
-            lower.delete();
-            upper.delete();
-            requestAnimationFrame(detectColor); // Process next frame
-        }
-
-        detectColor(); // Start color detection
+        const detect = async () => {
+            const predictions = await model.detect(video);
+            drawPredictions(predictions);
+            requestAnimationFrame(detect);
+        };
+        detect(); // Start detection
     }
 
-    // Initialize OpenCV
+    // Function to draw bounding boxes and labels on the canvas
+    function drawPredictions(predictions) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        predictions.forEach(prediction => {
+            // Draw bounding box
+            ctx.beginPath();
+            ctx.rect(...prediction.bbox);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'red';
+            ctx.fillStyle = 'red';
+            ctx.stroke();
+            ctx.fillText(`${prediction.class} (${Math.round(prediction.score * 100)}%)`, prediction.bbox[0], prediction.bbox[1] > 10 ? prediction.bbox[1] - 5 : 10);
+        });
+    }
+
+    // Initialize the camera when the page loads
     document.addEventListener('DOMContentLoaded', startCamera);
 </script>
 
