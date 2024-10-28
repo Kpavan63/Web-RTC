@@ -1,101 +1,136 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Color-Based Object Detection with OpenCV.js</title>
-  <style>
-    body {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      font-family: Arial, sans-serif;
-      height: 100vh;
-      margin: 0;
-    }
-    #canvasOutput {
-      border: 2px solid #4CAF50;
-      border-radius: 8px;
-      margin-top: 20px;
-      width: 100%;
-      max-width: 600px;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Color-Based Object Detection with OpenCV.js</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: Arial, sans-serif;
+            height: 100vh;
+            margin: 0;
+        }
+        #canvasOutput {
+            border: 2px solid #4CAF50;
+            border-radius: 8px;
+            margin-top: 20px;
+            width: 100%;
+            max-width: 600px;
+        }
+        #videoInput {
+            display: none; /* Hide the video element */
+        }
+        .btn {
+            padding: 10px 20px;
+            margin-top: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+    </style>
 </head>
 <body>
 
-  <h1>Color-Based Object Detection</h1>
-  <video id="videoInput" autoplay playsinline style="display: none;"></video>
-  <canvas id="canvasOutput"></canvas>
+<h1>Color-Based Object Detection</h1>
+<button class="btn" onclick="toggleCamera()">Switch Camera</button>
+<video id="videoInput" autoplay playsinline></video>
+<canvas id="canvasOutput"></canvas>
 
-  <!-- OpenCV.js Library -->
-  <script async src="https://docs.opencv.org/4.x/opencv.js" type="text/javascript"></script>
-  
-  <script>
-    async function onOpenCvReady() {
-      const video = document.getElementById('videoInput');
-      const canvas = document.getElementById('canvasOutput');
-      const ctx = canvas.getContext('2d');
+<!-- OpenCV.js Library -->
+<script async src="https://docs.opencv.org/4.x/opencv.js" type="text/javascript"></script>
 
-      // Start the camera stream
-      navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
-        video.srcObject = stream;
-        video.play();
-        video.onloadedmetadata = () => {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          processVideo();
+<script>
+    let video = document.getElementById('videoInput');
+    let canvas = document.getElementById('canvasOutput');
+    let ctx = canvas.getContext('2d');
+    let useFrontCamera = true;
+    let videoStream;
+
+    // Function to start the camera
+    async function startCamera() {
+        const constraints = {
+            video: {
+                facingMode: useFrontCamera ? 'user' : 'environment',
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            }
         };
-      });
+        try {
+            videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+            video.srcObject = videoStream;
+            video.play();
+            video.onloadedmetadata = () => {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                processVideo();
+            };
+        } catch (error) {
+            console.error('Error accessing camera:', error);
+            alert('Unable to access the camera. Please check permissions.');
+        }
+    }
 
-      // Process each frame for color detection
-      function processVideo() {
+    // Function to toggle between front and back cameras
+    function toggleCamera() {
+        useFrontCamera = !useFrontCamera;
+        if (videoStream) {
+            videoStream.getTracks().forEach(track => track.stop()); // Stop previous stream
+        }
+        startCamera();
+    }
+
+    // Function to process video frames for color detection
+    function processVideo() {
         const src = new cv.Mat(video.height, video.width, cv.CV_8UC4);
         const dst = new cv.Mat(video.height, video.width, cv.CV_8UC1);
         const cap = new cv.VideoCapture(video);
 
         function detectColor() {
-          cap.read(src);
-          cv.cvtColor(src, dst, cv.COLOR_RGBA2RGB);
-          
-          // Convert to HSV and apply color threshold (example for red color)
-          cv.cvtColor(dst, dst, cv.COLOR_RGB2HSV);
-          const lower = new cv.Mat(dst.rows, dst.cols, dst.type(), [0, 150, 50, 0]);
-          const upper = new cv.Mat(dst.rows, dst.cols, dst.type(), [10, 255, 255, 255]);
-          const mask = new cv.Mat();
-          cv.inRange(dst, lower, upper, mask);
+            cap.read(src);
+            cv.cvtColor(src, dst, cv.COLOR_RGBA2RGB);
 
-          // Find contours of the object
-          const contours = new cv.MatVector();
-          const hierarchy = new cv.Mat();
-          cv.findContours(mask, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+            // Convert to HSV and apply color threshold (example for red color)
+            cv.cvtColor(dst, dst, cv.COLOR_RGB2HSV);
+            const lower = new cv.Mat(dst.rows, dst.cols, dst.type(), [0, 150, 50, 0]);
+            const upper = new cv.Mat(dst.rows, dst.cols, dst.type(), [10, 255, 255, 255]);
+            const mask = new cv.Mat();
+            cv.inRange(dst, lower, upper, mask);
 
-          // Draw bounding boxes for each contour found
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          for (let i = 0; i < contours.size(); i++) {
-            const rect = cv.boundingRect(contours.get(i));
-            ctx.strokeStyle = "#FF0000";
-            ctx.lineWidth = 2;
-            ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
-          }
+            // Find contours of the object
+            const contours = new cv.MatVector();
+            const hierarchy = new cv.Mat();
+            cv.findContours(mask, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
-          // Clean up
-          mask.delete();
-          contours.delete();
-          hierarchy.delete();
-          lower.delete();
-          upper.delete();
-          requestAnimationFrame(detectColor);  // Process next frame
+            // Draw bounding boxes for each contour found
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < contours.size(); i++) {
+                const rect = cv.boundingRect(contours.get(i));
+                ctx.strokeStyle = "#FF0000";
+                ctx.lineWidth = 2;
+                ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+            }
+
+            // Clean up
+            mask.delete();
+            contours.delete();
+            hierarchy.delete();
+            lower.delete();
+            upper.delete();
+            requestAnimationFrame(detectColor); // Process next frame
         }
 
-        detectColor();  // Start color detection
-      }
+        detectColor(); // Start color detection
     }
 
     // Initialize OpenCV
-    document.addEventListener('DOMContentLoaded', onOpenCvReady);
-  </script>
+    document.addEventListener('DOMContentLoaded', startCamera);
+</script>
 
 </body>
 </html>
