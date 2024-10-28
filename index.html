@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Object Detection with MediaPipe</title>
+  <title>Real-Time Object Detection with Bounding Boxes</title>
   <style>
     body {
       display: flex;
@@ -12,8 +12,14 @@
       justify-content: center;
       font-family: Arial, sans-serif;
       height: 100vh;
+      margin: 0;
     }
-    #camera-stream {
+    #canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    #video {
       width: 100%;
       max-width: 600px;
       border: 2px solid #4CAF50;
@@ -29,39 +35,33 @@
       cursor: pointer;
       border-radius: 5px;
     }
-    #result {
-      margin-top: 20px;
-      font-size: 20px;
-    }
   </style>
 </head>
 <body>
 
   <h1>Object Detection Camera</h1>
   <button class="btn" onclick="toggleCamera()">Switch Camera</button>
-  <video id="camera-stream" autoplay playsinline></video>
-  <div id="result">Detected Object: <span id="object-name">None</span></div>
+  <video id="video" autoplay playsinline></video>
+  <canvas id="canvas"></canvas>
 
-  <!-- Load MediaPipe Library -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/objectron"></script>
+  <!-- TensorFlow.js Library -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <!-- COCO-SSD Model -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 
   <script>
-    let videoStream;
+    let video = document.getElementById('video');
+    let canvas = document.getElementById('canvas');
+    let context = canvas.getContext('2d');
+    let model;
     let useFrontCamera = true;
-    let objectron;
+    let videoStream;
 
+    // Load the COCO-SSD model
     async function loadModel() {
-      objectron = new Objectron({
-        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/objectron/${file}`
-      });
-      objectron.setOptions({
-        modelComplexity: 1,
-        maxNumObjects: 5,
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5
-      });
-      objectron.onResults(onResults);
+      model = await cocoSsd.load();
       console.log("Model Loaded!");
+      detectObjects(); // Start detecting objects
     }
 
     // Toggle between front and back cameras
@@ -70,10 +70,10 @@
       startCamera();
     }
 
-    // Start the camera and display the video stream
+    // Start the camera and set up the video stream
     async function startCamera() {
       if (videoStream) {
-        videoStream.getTracks().forEach(track => track.stop());
+        videoStream.getTracks().forEach(track => track.stop()); // Stop previous stream
       }
       const constraints = {
         video: {
@@ -82,12 +82,11 @@
       };
       try {
         videoStream = await navigator.mediaDevices.getUserMedia(constraints);
-        const video = document.getElementById('camera-stream');
         video.srcObject = videoStream;
-
-        // Feed video to MediaPipe for object detection
-        video.onloadeddata = () => {
-          objectron.send({ image: video });
+        video.onloadedmetadata = () => {
+          video.play();
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
         };
       } catch (error) {
         console.error("Error accessing camera:", error);
@@ -95,15 +94,29 @@
       }
     }
 
-    // Handle detection results from MediaPipe
-    function onResults(results) {
-      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        document.getElementById('object-name').innerText = "Object Detected!";
-      } else {
-        document.getElementById('object-name').innerText = "None";
+    // Detect objects in the video feed and draw bounding boxes
+    async function detectObjects() {
+      if (model && video) {
+        const predictions = await model.detect(video);
+
+        // Clear the canvas
+        context.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw each detected object's bounding box and label
+        predictions.forEach(prediction => {
+          const [x, y, width, height] = prediction.bbox;
+          context.strokeStyle = "#FF0000";
+          context.lineWidth = 2;
+          context.strokeRect(x, y, width, height);
+
+          context.fillStyle = "#FF0000";
+          context.font = "16px Arial";
+          context.fillText(`${prediction.class} - ${Math.round(prediction.score * 100)}%`, x, y > 10 ? y - 5 : 10);
+        });
+
+        // Run object detection continuously
+        requestAnimationFrame(detectObjects);
       }
-      // Loop detection
-      requestAnimationFrame(() => objectron.send({ image: document.getElementById('camera-stream') }));
     }
 
     // Load the model and start the camera
