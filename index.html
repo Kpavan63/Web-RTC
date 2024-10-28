@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Object Detection with TensorFlow.js</title>
+    <title>Enhanced Food AI with Nutrition and Recipes</title>
     <style>
         body {
             display: flex;
@@ -13,21 +13,12 @@
             font-family: Arial, sans-serif;
             height: 100vh;
             margin: 0;
-            background-color: #f4f4f4;
+            background-color: #e7f5e5;
         }
-        video {
-            border: 2px solid #4CAF50;
+        video, canvas {
             border-radius: 8px;
-            margin-top: 20px;
             width: 100%;
             max-width: 600px;
-        }
-        canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            z-index: 10;
-            max-width: 100%;
         }
         .btn {
             padding: 10px 20px;
@@ -39,63 +30,27 @@
             border-radius: 5px;
             font-size: 16px;
         }
-        h1 {
-            margin-bottom: 10px;
-        }
-        #results {
+        #results, #nutritionInfo, #recipeSuggestions {
             margin-top: 20px;
             padding: 10px;
-            border: 2px solid #4CAF50;
-            border-radius: 8px;
             background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             max-width: 600px;
             width: 100%;
         }
-        #results h2 {
-            margin: 0;
+        h1, h2 {
             color: #4CAF50;
         }
-        #results ul {
+        ul {
             list-style-type: none;
             padding: 0;
-        }
-        #results li {
-            margin: 5px 0;
-        }
-        #photoTakenIcon {
-            display: none;
-            align-items: center;
-            gap: 8px;
-            color: #4CAF50;
-            font-size: 18px;
-            margin-top: 10px;
-        }
-        #photoTakenIcon svg {
-            width: 24px;
-            height: 24px;
-        }
-
-        /* Responsive Adjustments */
-        @media (max-width: 600px) {
-            .btn {
-                font-size: 14px;
-                padding: 8px 16px;
-            }
-            h1 {
-                font-size: 18px;
-            }
-            #results {
-                padding: 8px;
-            }
-            #photoTakenIcon {
-                font-size: 16px;
-            }
         }
     </style>
 </head>
 <body>
 
-<h1>Object Detection with TensorFlow.js</h1>
+<h1>Enhanced Food AI with Nutrition & Recipes</h1>
 <button class="btn" id="takePhotoButton">Take Photo</button>
 <video id="videoInput" autoplay playsinline></video>
 <canvas id="canvasOutput"></canvas>
@@ -104,14 +59,13 @@
     <h2>Detected Objects:</h2>
     <ul id="objectList"></ul>
 </div>
-
-<!-- Photo Taken Notification -->
-<div id="photoTakenIcon">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"></circle>
-        <path d="M12 8v4l2 2"></path>
-    </svg>
-    <span>Photo Taken!</span>
+<div id="nutritionInfo">
+    <h2>Nutrition Information:</h2>
+    <ul id="nutritionList"></ul>
+</div>
+<div id="recipeSuggestions">
+    <h2>Recipe Suggestions:</h2>
+    <ul id="recipeList"></ul>
 </div>
 
 <!-- TensorFlow.js and COCO-SSD Library -->
@@ -123,88 +77,103 @@
     const canvas = document.getElementById('canvasOutput');
     const ctx = canvas.getContext('2d');
     const objectList = document.getElementById('objectList');
-    const photoTakenIcon = document.getElementById('photoTakenIcon');
+    const nutritionList = document.getElementById('nutritionList');
+    const recipeList = document.getElementById('recipeList');
     let objectDetector;
 
-    // Start the camera
+    // Placeholder nutrition and recipe data
+    const nutritionData = {
+        apple: "Calories: 95, Carbs: 25g, Fiber: 4g, Sugar: 19g",
+        banana: "Calories: 105, Carbs: 27g, Fiber: 3g, Sugar: 14g"
+    };
+    const recipeData = {
+        apple: ["Apple Pie", "Apple Crumble", "Apple Salad"],
+        banana: ["Banana Bread", "Banana Smoothie", "Banana Pancakes"]
+    };
+
     async function startCamera() {
-        const constraints = {
-            video: {
-                facingMode: 'environment', // Use 'user' for front camera
-            }
-        };
+        const constraints = { video: { facingMode: 'environment' } };
         try {
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
             video.srcObject = stream;
             video.play();
         } catch (error) {
             console.error('Error accessing the camera:', error);
-            alert('Unable to access the camera. Please check permissions.');
+            alert('Please enable camera permissions.');
         }
     }
 
-    // Initialize the object detection model
     async function setupObjectDetector() {
         objectDetector = await cocoSsd.load();
         console.log('Model Loaded!');
     }
 
-    // Take a photo and detect objects
     async function takePhoto() {
-        // Set canvas size to match video
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-
-        // Draw the video frame to the canvas
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        // Detect objects in the captured image
         const predictions = await objectDetector.detect(canvas);
         drawPredictions(predictions);
         displayDetectedObjects(predictions);
-
-        // Show the photo taken notification
-        photoTakenIcon.style.display = 'flex'; // Show icon and text
-        setTimeout(() => {
-            photoTakenIcon.style.display = 'none'; // Hide after 2 seconds
-        }, 2000);
+        displayNutritionInfo(predictions);
+        suggestRecipes(predictions);
     }
 
-    // Draw predictions on the canvas
     function drawPredictions(predictions) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height); // Redraw the video frame
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
         predictions.forEach(prediction => {
-            // Draw bounding box
             ctx.beginPath();
             ctx.rect(prediction.bbox[0], prediction.bbox[1], prediction.bbox[2], prediction.bbox[3]);
             ctx.lineWidth = 2;
-            ctx.strokeStyle = 'red';
-            ctx.fillStyle = 'red';
+            ctx.strokeStyle = 'green';
             ctx.stroke();
-            ctx.fillText(`${prediction.class} (${Math.round(prediction.score * 100)}%)`, prediction.bbox[0], prediction.bbox[1] > 10 ? prediction.bbox[1] - 5 : 10);
+            ctx.fillStyle = 'green';
+            ctx.fillText(prediction.class, prediction.bbox[0], prediction.bbox[1] > 10 ? prediction.bbox[1] - 5 : 10);
         });
     }
 
-    // Display detected objects in the results section
     function displayDetectedObjects(predictions) {
-        objectList.innerHTML = ''; // Clear previous results
+        objectList.innerHTML = '';
         predictions.forEach(prediction => {
             const li = document.createElement('li');
-            li.textContent = `${prediction.class} (${Math.round(prediction.score * 100)}%)`;
+            li.textContent = prediction.class;
             objectList.appendChild(li);
         });
     }
 
-    // Initialize the camera and setup event listeners
+    function displayNutritionInfo(predictions) {
+        nutritionList.innerHTML = '';
+        predictions.forEach(prediction => {
+            const nutrition = nutritionData[prediction.class.toLowerCase()];
+            if (nutrition) {
+                const li = document.createElement('li');
+                li.textContent = `${prediction.class}: ${nutrition}`;
+                nutritionList.appendChild(li);
+            }
+        });
+    }
+
+    function suggestRecipes(predictions) {
+        recipeList.innerHTML = '';
+        predictions.forEach(prediction => {
+            const recipes = recipeData[prediction.class.toLowerCase()];
+            if (recipes) {
+                recipes.forEach(recipe => {
+                    const li = document.createElement('li');
+                    li.textContent = recipe;
+                    recipeList.appendChild(li);
+                });
+            }
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         startCamera();
         setupObjectDetector();
-        document.getElementById('takePhotoButton').addEventListener('click', () => {
-            console.log('Take Photo button clicked');
-            takePhoto();
-        });
+        document.getElementById('takePhotoButton').addEventListener('click', takePhoto);
     });
 </script>
 
