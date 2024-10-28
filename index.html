@@ -27,6 +27,7 @@
             top: 0;
             left: 0;
             z-index: 10;
+            max-width: 100%;
         }
         .btn {
             padding: 10px 20px;
@@ -62,7 +63,7 @@
             margin: 5px 0;
         }
         #photoTakenIcon {
-            display: none; /* Hide icon initially */
+            display: none;
             align-items: center;
             gap: 8px;
             color: #4CAF50;
@@ -72,6 +73,23 @@
         #photoTakenIcon svg {
             width: 24px;
             height: 24px;
+        }
+
+        /* Responsive Adjustments */
+        @media (max-width: 600px) {
+            .btn {
+                font-size: 14px;
+                padding: 8px 16px;
+            }
+            h1 {
+                font-size: 18px;
+            }
+            #results {
+                padding: 8px;
+            }
+            #photoTakenIcon {
+                font-size: 16px;
+            }
         }
     </style>
 </head>
