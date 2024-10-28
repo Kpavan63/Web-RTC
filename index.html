@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Real-Time Object Detection with Bounding Boxes</title>
+  <title>Color-Based Object Detection with OpenCV.js</title>
   <style>
     body {
       display: flex;
@@ -14,114 +14,87 @@
       height: 100vh;
       margin: 0;
     }
-    #canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-    }
-    #video {
-      width: 100%;
-      max-width: 600px;
+    #canvasOutput {
       border: 2px solid #4CAF50;
       border-radius: 8px;
       margin-top: 20px;
-    }
-    .btn {
-      padding: 10px 20px;
-      margin-top: 10px;
-      background-color: #4CAF50;
-      color: white;
-      border: none;
-      cursor: pointer;
-      border-radius: 5px;
+      width: 100%;
+      max-width: 600px;
     }
   </style>
 </head>
 <body>
 
-  <h1>Object Detection Camera</h1>
-  <button class="btn" onclick="toggleCamera()">Switch Camera</button>
-  <video id="video" autoplay playsinline></video>
-  <canvas id="canvas"></canvas>
+  <h1>Color-Based Object Detection</h1>
+  <video id="videoInput" autoplay playsinline style="display: none;"></video>
+  <canvas id="canvasOutput"></canvas>
 
-  <!-- TensorFlow.js Library -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-  <!-- COCO-SSD Model -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
-
+  <!-- OpenCV.js Library -->
+  <script async src="https://docs.opencv.org/4.x/opencv.js" type="text/javascript"></script>
+  
   <script>
-    let video = document.getElementById('video');
-    let canvas = document.getElementById('canvas');
-    let context = canvas.getContext('2d');
-    let model;
-    let useFrontCamera = true;
-    let videoStream;
+    async function onOpenCvReady() {
+      const video = document.getElementById('videoInput');
+      const canvas = document.getElementById('canvasOutput');
+      const ctx = canvas.getContext('2d');
 
-    // Load the COCO-SSD model
-    async function loadModel() {
-      model = await cocoSsd.load();
-      console.log("Model Loaded!");
-      detectObjects(); // Start detecting objects
-    }
-
-    // Toggle between front and back cameras
-    function toggleCamera() {
-      useFrontCamera = !useFrontCamera;
-      startCamera();
-    }
-
-    // Start the camera and set up the video stream
-    async function startCamera() {
-      if (videoStream) {
-        videoStream.getTracks().forEach(track => track.stop()); // Stop previous stream
-      }
-      const constraints = {
-        video: {
-          facingMode: useFrontCamera ? "user" : "environment"
-        }
-      };
-      try {
-        videoStream = await navigator.mediaDevices.getUserMedia(constraints);
-        video.srcObject = videoStream;
+      // Start the camera stream
+      navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+        video.srcObject = stream;
+        video.play();
         video.onloadedmetadata = () => {
-          video.play();
           canvas.width = video.videoWidth;
           canvas.height = video.videoHeight;
+          processVideo();
         };
-      } catch (error) {
-        console.error("Error accessing camera:", error);
-        alert("Unable to access the camera. Please check permissions.");
+      });
+
+      // Process each frame for color detection
+      function processVideo() {
+        const src = new cv.Mat(video.height, video.width, cv.CV_8UC4);
+        const dst = new cv.Mat(video.height, video.width, cv.CV_8UC1);
+        const cap = new cv.VideoCapture(video);
+
+        function detectColor() {
+          cap.read(src);
+          cv.cvtColor(src, dst, cv.COLOR_RGBA2RGB);
+          
+          // Convert to HSV and apply color threshold (example for red color)
+          cv.cvtColor(dst, dst, cv.COLOR_RGB2HSV);
+          const lower = new cv.Mat(dst.rows, dst.cols, dst.type(), [0, 150, 50, 0]);
+          const upper = new cv.Mat(dst.rows, dst.cols, dst.type(), [10, 255, 255, 255]);
+          const mask = new cv.Mat();
+          cv.inRange(dst, lower, upper, mask);
+
+          // Find contours of the object
+          const contours = new cv.MatVector();
+          const hierarchy = new cv.Mat();
+          cv.findContours(mask, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+          // Draw bounding boxes for each contour found
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          for (let i = 0; i < contours.size(); i++) {
+            const rect = cv.boundingRect(contours.get(i));
+            ctx.strokeStyle = "#FF0000";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+          }
+
+          // Clean up
+          mask.delete();
+          contours.delete();
+          hierarchy.delete();
+          lower.delete();
+          upper.delete();
+          requestAnimationFrame(detectColor);  // Process next frame
+        }
+
+        detectColor();  // Start color detection
       }
     }
 
-    // Detect objects in the video feed and draw bounding boxes
-    async function detectObjects() {
-      if (model && video) {
-        const predictions = await model.detect(video);
-
-        // Clear the canvas
-        context.clearRect(0, 0, canvas.width, canvas.height);
-
-        // Draw each detected object's bounding box and label
-        predictions.forEach(prediction => {
-          const [x, y, width, height] = prediction.bbox;
-          context.strokeStyle = "#FF0000";
-          context.lineWidth = 2;
-          context.strokeRect(x, y, width, height);
-
-          context.fillStyle = "#FF0000";
-          context.font = "16px Arial";
-          context.fillText(`${prediction.class} - ${Math.round(prediction.score * 100)}%`, x, y > 10 ? y - 5 : 10);
-        });
-
-        // Run object detection continuously
-        requestAnimationFrame(detectObjects);
-      }
-    }
-
-    // Load the model and start the camera
-    loadModel();
-    startCamera();
+    // Initialize OpenCV
+    document.addEventListener('DOMContentLoaded', onOpenCvReady);
   </script>
 
 </body>
