@@ -77,10 +77,8 @@
     <p id="objectInfo"></p>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/2.9.0/tf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/ml5/0.6.0/ml5.min.js"></script>
 
 <script>
     const video = document.getElementById('videoInput');
@@ -102,7 +100,7 @@
     }
 
     async function loadModel() {
-        model = await ml5.objectDetector('cocossd');
+        model = await cocoSsd.load();
         console.log('Model Loaded!');
     }
 
@@ -112,16 +110,9 @@
         canvas.height = video.videoHeight;
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        // Using ml5.js for object detection
-        model.detect(canvas, (err, results) => {
-            if (err) {
-                console.error(err);
-                return;
-            }
-            predictions = results;
-            displayDetectedObjects();
-            loadingText.style.display = 'none';
-        });
+        predictions = await model.detect(canvas);
+        displayDetectedObjects();
+        loadingText.style.display = 'none';
     }
 
     function displayDetectedObjects() {
@@ -129,7 +120,7 @@
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
         predictions.forEach(prediction => {
-            const [x, y, width, height] = prediction.x, prediction.y, prediction.width, prediction.height;
+            const [x, y, width, height] = prediction.bbox;
 
             // Draw bounding box
             ctx.strokeStyle = 'red';
@@ -137,8 +128,8 @@
             ctx.strokeRect(x, y, width, height);
 
             // Show object name and call speak function
-            showObjectInfo(prediction.label);
-            speak(prediction.label);
+            showObjectInfo(prediction.class);
+            speak(prediction.class);
         });
     }
 
