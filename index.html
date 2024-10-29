@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enhanced Food AI Assistant with Effects</title>
+    <title>Advanced Object Detection Assistant</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            background-color: #e8f5e9;
+            background-color: #f0f4f8;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -17,7 +17,7 @@
         header {
             width: 100%;
             padding: 15px;
-            background-color: #388e3c;
+            background-color: #4caf50;
             color: white;
             text-align: center;
             font-size: 24px;
@@ -34,11 +34,12 @@
         video, canvas {
             width: 100%;
             border-radius: 12px;
-            border: 3px solid #388e3c;
+            border: 3px solid #4caf50;
+            display: block;
         }
         .btn {
             padding: 10px 20px;
-            background-color: #388e3c;
+            background-color: #4caf50;
             color: white;
             border: none;
             border-radius: 8px;
@@ -47,86 +48,31 @@
             margin: 5px;
         }
         .btn:hover {
-            background-color: #4CAF50;
+            background-color: #66bb6a;
         }
-        .card {
-            background-color: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            padding: 20px;
-            width: 100%;
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4caf50;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 0.8s linear infinite;
         }
-        h2 {
-            color: #388e3c;
-            margin-top: 0;
-        }
-        #objectList, #nutritionList, #recipeList, #historyList, #mealLog {
-            list-style-type: none;
-            padding: 0;
-        }
-        .glow-box {
-            animation: pulse 2s infinite;
-            border: 2px solid red;
-            box-shadow: 0 0 10px red, 0 0 20px red, 0 0 30px red;
-        }
-        @keyframes pulse {
-            0% { box-shadow: 0 0 10px red; }
-            50% { box-shadow: 0 0 20px red; }
-            100% { box-shadow: 0 0 10px red; }
-        }
-        #controlPanel {
-            display: flex;
-            gap: 10px;
-            align-items: center;
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
 
-<header>Enhanced Food AI Assistant with Effects</header>
+<header>Advanced Object Detection Assistant</header>
 
 <div class="container">
-    <div id="controlPanel">
-        <label>Confidence Threshold:</label>
-        <input type="range" id="confidenceThreshold" min="0.1" max="1" step="0.1" value="0.5">
-        <button class="btn" id="toggleBoundingBox">Toggle Bounding Box</button>
-        <button class="btn" id="refreshCamera">Refresh Camera</button>
-    </div>
-    <select id="languageSelect" class="btn">
-        <option value="en">English</option>
-        <option value="te">Telugu</option>
-    </select>
     <button class="btn" id="takePhotoButton">Take Photo</button>
     <video id="videoInput" autoplay playsinline></video>
     <canvas id="canvasOutput"></canvas>
-
-    <div class="card" id="results">
-        <h2>Detected Objects</h2>
-        <ul id="objectList"></ul>
-    </div>
-
-    <div class="card" id="nutritionInfo">
-        <h2>Nutrition Information</h2>
-        <label>Serving Size:</label>
-        <input type="number" id="servingSize" value="1" min="1" style="width: 50px;">
-        <ul id="nutritionList"></ul>
-    </div>
-
-    <div class="card" id="recipeSuggestions">
-        <h2>Recipe Suggestions</h2>
-        <ul id="recipeList"></ul>
-    </div>
-
-    <div class="card" id="history">
-        <h2>Detection History</h2>
-        <ul id="historyList"></ul>
-    </div>
-
-    <div class="card" id="calorieTracker">
-        <h2>Meal Log & Calorie Tracker</h2>
-        <ul id="mealLog"></ul>
-        <p>Total Calories: <span id="totalCalories">0</span> kcal</p>
-    </div>
+    <div id="loader" class="loader" style="display: none;"></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
@@ -136,60 +82,73 @@
     const video = document.getElementById('videoInput');
     const canvas = document.getElementById('canvasOutput');
     const ctx = canvas.getContext('2d');
-    const confidenceThreshold = document.getElementById('confidenceThreshold');
-    const objectList = document.getElementById('objectList');
-    let showBoundingBox = true;
-    let objectDetector;
-    let calorieCount = 0;
+    const loader = document.getElementById('loader');
+    let model;
 
     async function startCamera() {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-        video.srcObject = stream;
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            video.srcObject = stream;
+        } catch (error) {
+            alert('Please enable camera permissions.');
+        }
     }
 
-    async function setupObjectDetector() {
-        objectDetector = await cocoSsd.load();
+    async function loadModel() {
+        loader.style.display = 'block';
+        model = await cocoSsd.load();
+        loader.style.display = 'none';
+        console.log('Model Loaded!');
     }
 
-    async function captureAndDetect() {
+    async function takePhoto() {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        const predictions = await objectDetector.detect(canvas);
-        objectList.innerHTML = '';
+        loader.style.display = 'block';
+        const predictions = await model.detect(canvas);
+        loader.style.display = 'none';
+        
+        displayDetectedObjects(predictions);
+        speakDetectedItems(predictions);
+    }
+
+    function displayDetectedObjects(predictions) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
+        
         predictions.forEach(prediction => {
-            if (prediction.score >= parseFloat(confidenceThreshold.value)) {
+            ctx.beginPath();
+            ctx.rect(...prediction.bbox);
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'red';
+            ctx.fillStyle = 'red';
+            ctx.stroke();
+            ctx.fillText(prediction.class, prediction.bbox[0] + 5, prediction.bbox[1] > 20 ? prediction.bbox[1] - 5 : 10);
+            ctx.font = '16px Arial';
+        });
+
+        canvas.addEventListener('click', (e) => {
+            predictions.forEach(prediction => {
                 const [x, y, width, height] = prediction.bbox;
-
-                if (showBoundingBox) {
-                    ctx.strokeStyle = 'red';
-                    ctx.lineWidth = 2;
-                    ctx.strokeRect(x, y, width, height);
-                    ctx.fillStyle = 'red';
-                    ctx.font = '16px Arial';
-                    ctx.fillText(`${prediction.class} (${(prediction.score * 100).toFixed(2)}%)`, x, y > 10 ? y - 5 : 10);
+                if (e.offsetX > x && e.offsetX < x + width && e.offsetY > y && e.offsetY < y + height) {
+                    alert(`This is a ${prediction.class}`);
                 }
-
-                const li = document.createElement('li');
-                li.textContent = `${prediction.class} (${(prediction.score * 100).toFixed(2)}%)`;
-                li.classList.add('glow-box');
-                objectList.appendChild(li);
-            }
+            });
         });
     }
 
-    document.getElementById('takePhotoButton').addEventListener('click', captureAndDetect);
-    document.getElementById('toggleBoundingBox').addEventListener('click', () => {
-        showBoundingBox = !showBoundingBox;
-    });
-    document.getElementById('refreshCamera').addEventListener('click', startCamera);
+    function speakDetectedItems(predictions) {
+        const utterance = new SpeechSynthesisUtterance();
+        utterance.text = "Detected items: " + predictions.map(pred => pred.class).join(", ");
+        utterance.lang = 'en';
+        speechSynthesis.speak(utterance);
+    }
 
+    document.getElementById('takePhotoButton').addEventListener('click', takePhoto);
     startCamera();
-    setupObjectDetector();
+    loadModel();
 </script>
 
 </body>
