@@ -25,11 +25,7 @@
         .container {
             max-width: 800px;
             width: 100%;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 20px;
+            position: relative;
         }
         video, canvas {
             width: 100%;
@@ -37,14 +33,21 @@
             border: 3px solid #4caf50;
         }
         .btn {
-            padding: 10px 20px;
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
             background-color: #4caf50;
-            color: white;
             border: none;
-            border-radius: 8px;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             cursor: pointer;
-            font-size: 16px;
-            margin: 5px;
+            font-size: 24px;
+            color: white;
         }
         .btn:hover {
             background-color: #66bb6a;
@@ -52,10 +55,26 @@
         #loading {
             display: none;
             color: #4caf50;
+            text-align: center;
+            margin-top: 10px;
         }
         #objectInfo {
             margin-top: 10px;
             color: #333;
+            text-align: center;
+        }
+        .pin {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background-color: red;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
         }
     </style>
 </head>
@@ -64,16 +83,10 @@
 <header>Interactive Object Detection Assistant</header>
 
 <div class="container">
-    <select id="languageSelect" class="btn">
-        <option value="en">English</option>
-        <option value="es">Spanish</option>
-        <option value="fr">French</option>
-        <option value="te">Telugu</option>
-    </select>
-    <button class="btn" id="takePhotoButton">Take Photo</button>
-    <p id="loading">Detecting objects, please wait...</p>
     <video id="videoInput" autoplay playsinline></video>
     <canvas id="canvasOutput"></canvas>
+    <button class="btn" id="takePhotoButton">📸</button>
+    <p id="loading">Detecting objects, please wait...</p>
     <p id="objectInfo"></p>
 </div>
 
@@ -87,6 +100,7 @@
     const loadingText = document.getElementById('loading');
     const objectInfo = document.getElementById('objectInfo');
     let model;
+    let predictions = [];
 
     async function startCamera() {
         try {
@@ -109,52 +123,73 @@
         canvas.height = video.videoHeight;
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        const predictions = await model.detect(canvas);
-        displayDetectedObjects(predictions);
-        speakDetectedItems(predictions);
+        predictions = await model.detect(canvas);
+        displayDetectedObjects();
 
         loadingText.style.display = 'none';
     }
 
-    function displayDetectedObjects(predictions) {
+    function displayDetectedObjects() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        predictions.forEach(prediction => {
+        // Clear existing pins
+        document.querySelectorAll('.pin').forEach(pin => pin.remove());
+
+        predictions.forEach((prediction, index) => {
             const [x, y, width, height] = prediction.bbox;
-            
-            // Draw a bounding box
+
+            // Draw bounding box
             ctx.strokeStyle = 'red';
             ctx.lineWidth = 2;
             ctx.strokeRect(x, y, width, height);
 
-            // Draw a clickable pointer
-            const pointerX = x + width / 2;
-            const pointerY = y + height / 2;
-            ctx.beginPath();
-            ctx.arc(pointerX, pointerY, 6, 0, 2 * Math.PI);
-            ctx.fillStyle = 'blue';
-            ctx.fill();
-            
-            // Set up event listener for clicking on the pointers
-            canvas.onclick = (event) => {
-                const clickX = event.offsetX;
-                const clickY = event.offsetY;
-                
-                const distance = Math.sqrt(Math.pow(clickX - pointerX, 2) + Math.pow(clickY - pointerY, 2));
-                if (distance < 10) {
-                    objectInfo.textContent = `Clicked on: ${prediction.class}`;
-                }
-            };
+            // Add a pin element for each object
+            const pin = document.createElement('div');
+            pin.className = 'pin';
+            pin.style.left = `${x + width / 2}px`;
+            pin.style.top = `${y + height / 2}px`;
+            pin.textContent = index + 1; // Pin number
+
+            // Add click event to show object name
+            pin.onclick = () => showObjectInfo(prediction.class);
+
+            document.querySelector('.container').appendChild(pin);
         });
     }
 
-    function speakDetectedItems(predictions) {
-        const utterance = new SpeechSynthesisUtterance();
-        utterance.lang = document.getElementById('languageSelect').value;
-        utterance.text = "Detected items: " + predictions.map(pred => pred.class).join(", ");
-        speechSynthesis.speak(utterance);
+    function showObjectInfo(objectName) {
+        objectInfo.textContent = `Object: ${objectName}`;
     }
+
+    // Function to place custom pointer on canvas
+    canvas.addEventListener('click', (event) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+
+        // Find the nearest prediction to this point
+        const nearestPrediction = predictions.reduce((closest, prediction) => {
+            const [px, py] = prediction.bbox;
+            const distance = Math.sqrt((px + prediction.bbox[2] / 2 - x) ** 2 + (py + prediction.bbox[3] / 2 - y) ** 2);
+            if (closest === null || distance < closest.distance) {
+                return { prediction, distance };
+            }
+            return closest;
+        }, null);
+
+        if (nearestPrediction && nearestPrediction.distance < 50) { // Tolerance distance
+            const pin = document.createElement('div');
+            pin.className = 'pin';
+            pin.style.left = `${x}px`;
+            pin.style.top = `${y}px`;
+            pin.textContent = nearestPrediction.prediction.class; // Object name
+
+            // Show object name on click
+            pin.onclick = () => showObjectInfo(nearestPrediction.prediction.class);
+            document.querySelector('.container').appendChild(pin);
+        }
+    });
 
     document.getElementById('takePhotoButton').addEventListener('click', takePhoto);
     startCamera();
