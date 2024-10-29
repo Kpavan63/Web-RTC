@@ -88,6 +88,7 @@
     const objectInfo = document.getElementById('objectInfo');
     let model;
     let predictions = [];
+    const announcedObjects = new Set(); // Set to track announced objects
 
     async function startCamera() {
         try {
@@ -102,17 +103,17 @@
     async function loadModel() {
         model = await cocoSsd.load();
         console.log('Model Loaded!');
-        detectObjects();
     }
 
-    async function detectObjects() {
+    async function takePhoto() {
+        loadingText.style.display = 'block';
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        predictions = await model.detect(video);
+        predictions = await model.detect(canvas);
         displayDetectedObjects();
-
-        requestAnimationFrame(detectObjects); // Continuous detection
+        loadingText.style.display = 'none';
     }
 
     function displayDetectedObjects() {
@@ -130,9 +131,15 @@
             ctx.font = '16px Arial';
             ctx.fillText(prediction.class, x, y > 10 ? y - 5 : 10); // Label above bounding box
 
-            // Show object name and call speak function
-            speak(prediction.class);
+            // Check if the object has already been announced
+            if (!announcedObjects.has(prediction.class)) {
+                speak(prediction.class);
+                announcedObjects.add(prediction.class); // Mark as announced
+            }
         });
+
+        // Clear announced objects after each photo
+        setTimeout(() => announcedObjects.clear(), 1000);
     }
 
     function speak(text) {
@@ -142,7 +149,7 @@
         window.speechSynthesis.speak(utterance);
     }
 
-    document.getElementById('takePhotoButton').addEventListener('click', detectObjects);
+    document.getElementById('takePhotoButton').addEventListener('click', takePhoto);
     startCamera();
     loadModel();
 </script>
