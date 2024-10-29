@@ -63,10 +63,13 @@
             color: #333;
             text-align: center;
         }
-        .detected {
-            position: absolute;
-            border: 2px solid yellow;
-            border-radius: 8px;
+        #detectedList {
+            margin-top: 20px;
+            text-align: left;
+        }
+        #detectedList li {
+            color: #4caf50;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -78,8 +81,9 @@
     <video id="videoInput" autoplay playsinline></video>
     <canvas id="canvasOutput"></canvas>
     <button class="btn" id="takePhotoButton">📸</button>
-    <p id="loading">Loading model...</p>
+    <p id="loading">Detecting objects, please wait...</p>
     <p id="objectInfo"></p>
+    <ul id="detectedList"></ul>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
@@ -91,11 +95,10 @@
     const ctx = canvas.getContext('2d');
     const loadingText = document.getElementById('loading');
     const objectInfo = document.getElementById('objectInfo');
+    const detectedList = document.getElementById('detectedList');
     let model;
     let predictions = [];
-    let isDetecting = false;
 
-    // Start the camera
     async function startCamera() {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
@@ -106,36 +109,26 @@
         }
     }
 
-    // Load the COCO-SSD model
     async function loadModel() {
-        loadingText.style.display = 'block';
         model = await cocoSsd.load();
-        loadingText.style.display = 'none';
         console.log('Model Loaded!');
-        isDetecting = true;
-        detectObjects();
     }
 
-    // Detect objects continuously
-    async function detectObjects() {
-        while (isDetecting) {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    async function takePhoto() {
+        loadingText.style.display = 'block';
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            predictions = await model.detect(canvas);
-            displayDetectedObjects();
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Adjust detection frequency
-        }
+        predictions = await model.detect(canvas);
+        displayDetectedObjects();
+        loadingText.style.display = 'none';
     }
 
-    // Function to display detected objects
     function displayDetectedObjects() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        // Unique objects already spoken
-        const spokenObjects = new Set();
+        detectedList.innerHTML = ''; // Clear previous list
 
         predictions.forEach(prediction => {
             const [x, y, width, height] = prediction.bbox;
@@ -144,39 +137,30 @@
             ctx.strokeStyle = 'red';
             ctx.lineWidth = 2;
             ctx.strokeRect(x, y, width, height);
-            ctx.fillStyle = 'red';
-            ctx.font = '16px Arial';
-            ctx.fillText(prediction.class, x, y > 10 ? y - 5 : 10); // Label above bounding box
 
-            // Speak the object name only if it hasn't been spoken yet
-            if (!spokenObjects.has(prediction.class)) {
-                speak(prediction.class);
-                spokenObjects.add(prediction.class);
-            }
+            // Update object list
+            const listItem = document.createElement('li');
+            listItem.textContent = prediction.class;
+            detectedList.appendChild(listItem);
+
+            // Speak object name if not already spoken
+            speak(prediction.class);
         });
-
-        // Clear predictions after processing
-        objectInfo.textContent = predictions.map(p => p.class).join(', ');
     }
 
-    // Function to synthesize speech
+    const spokenObjects = new Set(); // Keep track of spoken objects
+
     function speak(text) {
-        const utterance = new SpeechSynthesisUtterance();
-        utterance.lang = 'te-IN'; // Telugu language
-        utterance.text = text;
-        window.speechSynthesis.speak(utterance);
+        if (!spokenObjects.has(text)) { // Only speak if not already spoken
+            const utterance = new SpeechSynthesisUtterance();
+            utterance.lang = 'te-IN'; // Telugu language
+            utterance.text = text;
+            window.speechSynthesis.speak(utterance);
+            spokenObjects.add(text); // Mark this object as spoken
+        }
     }
 
-    // Event listener for taking a photo (optional)
-    document.getElementById('takePhotoButton').addEventListener('click', () => {
-        isDetecting = !isDetecting; // Toggle detection on button click
-        if (isDetecting) {
-            detectObjects();
-        } else {
-            objectInfo.textContent = "Detection paused.";
-        }
-    });
-
+    document.getElementById('takePhotoButton').addEventListener('click', takePhoto);
     startCamera();
     loadModel();
 </script>
