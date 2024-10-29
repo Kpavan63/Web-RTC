@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enhanced Food AI Assistant with Bounding Boxes</title>
+    <title>Enhanced Food AI Assistant with Effects</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -64,13 +64,34 @@
             list-style-type: none;
             padding: 0;
         }
+        .glow-box {
+            animation: pulse 2s infinite;
+            border: 2px solid red;
+            box-shadow: 0 0 10px red, 0 0 20px red, 0 0 30px red;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 10px red; }
+            50% { box-shadow: 0 0 20px red; }
+            100% { box-shadow: 0 0 10px red; }
+        }
+        #controlPanel {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
     </style>
 </head>
 <body>
 
-<header>Enhanced Food AI Assistant with Bounding Boxes</header>
+<header>Enhanced Food AI Assistant with Effects</header>
 
 <div class="container">
+    <div id="controlPanel">
+        <label>Confidence Threshold:</label>
+        <input type="range" id="confidenceThreshold" min="0.1" max="1" step="0.1" value="0.5">
+        <button class="btn" id="toggleBoundingBox">Toggle Bounding Box</button>
+        <button class="btn" id="refreshCamera">Refresh Camera</button>
+    </div>
     <select id="languageSelect" class="btn">
         <option value="en">English</option>
         <option value="te">Telugu</option>
@@ -115,39 +136,19 @@
     const video = document.getElementById('videoInput');
     const canvas = document.getElementById('canvasOutput');
     const ctx = canvas.getContext('2d');
+    const confidenceThreshold = document.getElementById('confidenceThreshold');
     const objectList = document.getElementById('objectList');
-    const nutritionList = document.getElementById('nutritionList');
-    const recipeList = document.getElementById('recipeList');
-    const historyList = document.getElementById('historyList');
-    const mealLog = document.getElementById('mealLog');
-    const totalCalories = document.getElementById('totalCalories');
-    const servingSizeInput = document.getElementById('servingSize');
+    let showBoundingBox = true;
     let objectDetector;
     let calorieCount = 0;
 
-    const nutritionData = {
-        apple: {calories: 95, carbs: 25, fiber: 4, sugar: 19},
-        banana: {calories: 105, carbs: 27, fiber: 3, sugar: 14}
-    };
-
-    const recipeData = {
-        apple: [{name: "Apple Pie"}, {name: "Apple Smoothie"}],
-        banana: [{name: "Banana Bread"}, {name: "Banana Smoothie"}]
-    };
-
     async function startCamera() {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-            video.srcObject = stream;
-        } catch (error) {
-            console.error('Error accessing the camera:', error);
-            alert('Please enable camera permissions.');
-        }
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        video.srcObject = stream;
     }
 
     async function setupObjectDetector() {
         objectDetector = await cocoSsd.load();
-        console.log('Object detector loaded!');
     }
 
     async function captureAndDetect() {
@@ -161,88 +162,32 @@
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
         predictions.forEach(prediction => {
-            ctx.strokeStyle = 'red';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(
-                prediction.bbox[0],
-                prediction.bbox[1],
-                prediction.bbox[2],
-                prediction.bbox[3]
-            );
+            if (prediction.score >= parseFloat(confidenceThreshold.value)) {
+                const [x, y, width, height] = prediction.bbox;
 
-            ctx.fillStyle = 'red';
-            ctx.font = '16px Arial';
-            ctx.fillText(
-                `${prediction.class} (${(prediction.score * 100).toFixed(2)}%)`,
-                prediction.bbox[0],
-                prediction.bbox[1] > 10 ? prediction.bbox[1] - 5 : 10
-            );
+                if (showBoundingBox) {
+                    ctx.strokeStyle = 'red';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(x, y, width, height);
+                    ctx.fillStyle = 'red';
+                    ctx.font = '16px Arial';
+                    ctx.fillText(`${prediction.class} (${(prediction.score * 100).toFixed(2)}%)`, x, y > 10 ? y - 5 : 10);
+                }
 
-            const li = document.createElement('li');
-            li.textContent = `${prediction.class} (${(prediction.score * 100).toFixed(2)}%)`;
-            objectList.appendChild(li);
-        });
-
-        displayNutritionInfo(predictions);
-        suggestRecipes(predictions);
-        updateDetectionHistory(predictions);
-        updateCalorieTracker(predictions);
-        speakDetectedItems(predictions);
-    }
-
-    function displayNutritionInfo(predictions) {
-        nutritionList.innerHTML = '';
-        const servingSize = parseFloat(servingSizeInput.value);
-        predictions.forEach(prediction => {
-            const nutrition = nutritionData[prediction.class.toLowerCase()];
-            if (nutrition) {
                 const li = document.createElement('li');
-                li.textContent = `${prediction.class}: Calories - ${nutrition.calories * servingSize}`;
-                nutritionList.appendChild(li);
+                li.textContent = `${prediction.class} (${(prediction.score * 100).toFixed(2)}%)`;
+                li.classList.add('glow-box');
+                objectList.appendChild(li);
             }
         });
-    }
-
-    function suggestRecipes(predictions) {
-        recipeList.innerHTML = '';
-        predictions.forEach(prediction => {
-            const recipes = recipeData[prediction.class.toLowerCase()];
-            if (recipes) {
-                recipes.forEach(recipe => {
-                    const li = document.createElement('li');
-                    li.textContent = recipe.name;
-                    recipeList.appendChild(li);
-                });
-            }
-        });
-    }
-
-    function updateDetectionHistory(predictions) {
-        predictions.forEach(prediction => {
-            const li = document.createElement('li');
-            li.textContent = prediction.class;
-            historyList.appendChild(li);
-        });
-    }
-
-    function updateCalorieTracker(predictions) {
-        predictions.forEach(prediction => {
-            const nutrition = nutritionData[prediction.class.toLowerCase()];
-            if (nutrition) {
-                calorieCount += nutrition.calories;
-                totalCalories.textContent = calorieCount;
-            }
-        });
-    }
-
-    function speakDetectedItems(predictions) {
-        const utterance = new SpeechSynthesisUtterance();
-        utterance.lang = document.getElementById('languageSelect').value === "te" ? "te-IN" : "en-US";
-        utterance.text = "Detected items: " + predictions.map(pred => pred.class).join(", ");
-        speechSynthesis.speak(utterance);
     }
 
     document.getElementById('takePhotoButton').addEventListener('click', captureAndDetect);
+    document.getElementById('toggleBoundingBox').addEventListener('click', () => {
+        showBoundingBox = !showBoundingBox;
+    });
+    document.getElementById('refreshCamera').addEventListener('click', startCamera);
+
     startCamera();
     setupObjectDetector();
 </script>
