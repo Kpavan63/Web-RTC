@@ -75,7 +75,6 @@
             justify-content: center;
             color: white;
             font-size: 14px;
-            pointer-events: auto;
         }
     </style>
 </head>
@@ -86,7 +85,12 @@
 <div class="container">
     <video id="videoInput" autoplay playsinline></video>
     <canvas id="canvasOutput"></canvas>
-    <button class="btn" id="takePhotoButton">📸</button>
+    <button class="btn" id="takePhotoButton">
+        <svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" fill="currentColor" class="bi bi-camera-fill" viewBox="0 0 16 16">
+            <path d="M10.5 8.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0"/>
+            <path d="M2 4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-1.172a2 2 0 0 1-1.414-.586l-.828-.828A2 2 0 0 0 9.172 2H6.828a2 2 0 0 0-1.414.586l-.828.828A2 2 0 0 1 3.172 4zm.5 2a.5.5 0 1 1 0-1 .5.5 0 0 1 0 1m9 2.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0"/>
+        </svg>
+    </button>
     <p id="loading">Detecting objects, please wait...</p>
     <p id="objectInfo"></p>
 </div>
@@ -102,6 +106,22 @@
     const objectInfo = document.getElementById('objectInfo');
     let model;
     let predictions = [];
+
+    // Initialize the Speech Recognition API
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = (event) => {
+        const command = event.results[0][0].transcript.toLowerCase();
+        console.log(`Voice Command: ${command}`);
+        detectObjectByName(command);
+    };
+
+    recognition.onerror = (event) => {
+        console.error('Speech recognition error', event.error);
+    };
 
     async function startCamera() {
         try {
@@ -148,9 +168,9 @@
             // Add a pin element for each object
             const pin = document.createElement('div');
             pin.className = 'pin';
-            pin.style.left = `${x + width / 2 - 10}px`; // Center the pin
-            pin.style.top = `${y + height / 2 - 10}px`; // Center the pin
-            pin.textContent = prediction.class; // Show object name
+            pin.style.left = `${x + width / 2}px`;
+            pin.style.top = `${y + height / 2}px`;
+            pin.textContent = index + 1; // Pin number
 
             // Add click event to show object name
             pin.onclick = () => showObjectInfo(prediction.class);
@@ -163,36 +183,18 @@
         objectInfo.textContent = `Object: ${objectName}`;
     }
 
-    // Function to place custom pointer on canvas
-    canvas.addEventListener('click', (event) => {
-        const rect = canvas.getBoundingClientRect();
-        const x = event.clientX - rect.left;
-        const y = event.clientY - rect.top;
-
-        // Find the nearest prediction to this point
-        const nearestPrediction = predictions.reduce((closest, prediction) => {
-            const [px, py] = prediction.bbox;
-            const distance = Math.sqrt((px + prediction.bbox[2] / 2 - x) ** 2 + (py + prediction.bbox[3] / 2 - y) ** 2);
-            if (closest === null || distance < closest.distance) {
-                return { prediction, distance };
-            }
-            return closest;
-        }, null);
-
-        if (nearestPrediction && nearestPrediction.distance < 50) { // Tolerance distance
-            const pin = document.createElement('div');
-            pin.className = 'pin';
-            pin.style.left = `${x}px`;
-            pin.style.top = `${y}px`;
-            pin.textContent = nearestPrediction.prediction.class; // Object name
-
-            // Show object name on click
-            pin.onclick = () => showObjectInfo(nearestPrediction.prediction.class);
-            document.querySelector('.container').appendChild(pin);
+    function detectObjectByName(name) {
+        const found = predictions.find(prediction => prediction.class.toLowerCase() === name);
+        if (found) {
+            showObjectInfo(found.class);
+            // Additional functionality can be added here, such as highlighting the object or providing more details
+        } else {
+            objectInfo.textContent = `No object detected with name: ${name}`;
         }
-    });
+    }
 
     document.getElementById('takePhotoButton').addEventListener('click', takePhoto);
+    video.addEventListener('click', () => recognition.start());
     startCamera();
     loadModel();
 </script>
