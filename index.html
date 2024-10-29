@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Object Detection Assistant</title>
+    <title>Interactive Object Detection Assistant</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -61,7 +61,7 @@
 </head>
 <body>
 
-<header>Advanced Object Detection Assistant</header>
+<header>Interactive Object Detection Assistant</header>
 
 <div class="container">
     <select id="languageSelect" class="btn">
@@ -121,28 +121,32 @@
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
         predictions.forEach(prediction => {
-            ctx.beginPath();
-            ctx.rect(...prediction.bbox);
-            ctx.lineWidth = 2;
+            const [x, y, width, height] = prediction.bbox;
+            
+            // Draw a bounding box
             ctx.strokeStyle = 'red';
-            ctx.fillStyle = 'red';
-            ctx.stroke();
-            ctx.fillText(prediction.class, prediction.bbox[0], prediction.bbox[1] > 10 ? prediction.bbox[1] - 5 : 10);
-        });
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, width, height);
 
-        // Add clickable event for each detected object
-        canvas.onclick = (event) => {
-            const x = event.offsetX, y = event.offsetY;
-            const clickedObject = predictions.find(prediction => 
-                x >= prediction.bbox[0] &&
-                x <= prediction.bbox[0] + prediction.bbox[2] &&
-                y >= prediction.bbox[1] &&
-                y <= prediction.bbox[1] + prediction.bbox[3]
-            );
-            if (clickedObject) {
-                objectInfo.textContent = `Clicked on: ${clickedObject.class}`;
-            }
-        };
+            // Draw a clickable pointer
+            const pointerX = x + width / 2;
+            const pointerY = y + height / 2;
+            ctx.beginPath();
+            ctx.arc(pointerX, pointerY, 6, 0, 2 * Math.PI);
+            ctx.fillStyle = 'blue';
+            ctx.fill();
+            
+            // Set up event listener for clicking on the pointers
+            canvas.onclick = (event) => {
+                const clickX = event.offsetX;
+                const clickY = event.offsetY;
+                
+                const distance = Math.sqrt(Math.pow(clickX - pointerX, 2) + Math.pow(clickY - pointerY, 2));
+                if (distance < 10) {
+                    objectInfo.textContent = `Clicked on: ${prediction.class}`;
+                }
+            };
+        });
     }
 
     function speakDetectedItems(predictions) {
