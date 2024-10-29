@@ -63,6 +63,11 @@
             color: #333;
             text-align: center;
         }
+        .detected {
+            position: absolute;
+            border: 2px solid yellow;
+            border-radius: 8px;
+        }
     </style>
 </head>
 <body>
@@ -73,7 +78,7 @@
     <video id="videoInput" autoplay playsinline></video>
     <canvas id="canvasOutput"></canvas>
     <button class="btn" id="takePhotoButton">📸</button>
-    <p id="loading">Detecting objects, please wait...</p>
+    <p id="loading">Loading model...</p>
     <p id="objectInfo"></p>
 </div>
 
@@ -88,8 +93,9 @@
     const objectInfo = document.getElementById('objectInfo');
     let model;
     let predictions = [];
-    const announcedObjects = new Set(); // Set to track announced objects
+    let isDetecting = false;
 
+    // Start the camera
     async function startCamera() {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
@@ -100,25 +106,36 @@
         }
     }
 
+    // Load the COCO-SSD model
     async function loadModel() {
-        model = await cocoSsd.load();
-        console.log('Model Loaded!');
-    }
-
-    async function takePhoto() {
         loadingText.style.display = 'block';
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        predictions = await model.detect(canvas);
-        displayDetectedObjects();
+        model = await cocoSsd.load();
         loadingText.style.display = 'none';
+        console.log('Model Loaded!');
+        isDetecting = true;
+        detectObjects();
     }
 
+    // Detect objects continuously
+    async function detectObjects() {
+        while (isDetecting) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            predictions = await model.detect(canvas);
+            displayDetectedObjects();
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Adjust detection frequency
+        }
+    }
+
+    // Function to display detected objects
     function displayDetectedObjects() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Unique objects already spoken
+        const spokenObjects = new Set();
 
         predictions.forEach(prediction => {
             const [x, y, width, height] = prediction.bbox;
@@ -131,17 +148,18 @@
             ctx.font = '16px Arial';
             ctx.fillText(prediction.class, x, y > 10 ? y - 5 : 10); // Label above bounding box
 
-            // Check if the object has already been announced
-            if (!announcedObjects.has(prediction.class)) {
+            // Speak the object name only if it hasn't been spoken yet
+            if (!spokenObjects.has(prediction.class)) {
                 speak(prediction.class);
-                announcedObjects.add(prediction.class); // Mark as announced
+                spokenObjects.add(prediction.class);
             }
         });
 
-        // Clear announced objects after each photo
-        setTimeout(() => announcedObjects.clear(), 1000);
+        // Clear predictions after processing
+        objectInfo.textContent = predictions.map(p => p.class).join(', ');
     }
 
+    // Function to synthesize speech
     function speak(text) {
         const utterance = new SpeechSynthesisUtterance();
         utterance.lang = 'te-IN'; // Telugu language
@@ -149,7 +167,16 @@
         window.speechSynthesis.speak(utterance);
     }
 
-    document.getElementById('takePhotoButton').addEventListener('click', takePhoto);
+    // Event listener for taking a photo (optional)
+    document.getElementById('takePhotoButton').addEventListener('click', () => {
+        isDetecting = !isDetecting; // Toggle detection on button click
+        if (isDetecting) {
+            detectObjects();
+        } else {
+            objectInfo.textContent = "Detection paused.";
+        }
+    });
+
     startCamera();
     loadModel();
 </script>
