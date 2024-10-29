@@ -71,11 +71,6 @@
 <header>Enhanced Food AI Assistant</header>
 
 <div class="container">
-    <select id="languageSelect" class="btn">
-        <option value="en">English</option>
-        <option value="es">Spanish</option>
-        <option value="fr">French</option>
-    </select>
     <button class="btn" id="takePhotoButton">Take Photo</button>
     <video id="videoInput" autoplay playsinline></video>
     <canvas id="canvasOutput"></canvas>
@@ -110,7 +105,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 
 <script>
     const video = document.getElementById('videoInput');
@@ -123,7 +118,7 @@
     const mealLog = document.getElementById('mealLog');
     const totalCalories = document.getElementById('totalCalories');
     const servingSizeInput = document.getElementById('servingSize');
-    let model;
+    let objectDetector;
     let calorieCount = 0;
 
     const nutritionData = {
@@ -146,41 +141,41 @@
         }
     }
 
-    async function loadModel() {
-        model = await mobilenet.load();
-        console.log('Model Loaded!');
+    async function setupObjectDetector() {
+        objectDetector = await cocoSsd.load();
+        console.log('Object detector loaded!');
     }
 
-    async function takePhoto() {
+    async function captureAndDetect() {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const predictions = await model.classify(canvas);
-        displayDetectedObjects(predictions);
-        displayNutritionInfo(predictions);
+        const predictions = await objectDetector.detect(canvas);
+        displayResults(predictions);
+        updateNutritionInfo(predictions);
         suggestRecipes(predictions);
         updateDetectionHistory(predictions);
         updateCalorieTracker(predictions);
         speakDetectedItems(predictions);
     }
 
-    function displayDetectedObjects(predictions) {
+    function displayResults(predictions) {
         objectList.innerHTML = '';
         predictions.forEach(prediction => {
             const li = document.createElement('li');
-            li.textContent = `${prediction.className} (${(prediction.probability * 100).toFixed(2)}%)`;
+            li.textContent = `${prediction.class} (${(prediction.score * 100).toFixed(2)}%)`;
             objectList.appendChild(li);
         });
     }
 
-    function displayNutritionInfo(predictions) {
+    function updateNutritionInfo(predictions) {
         nutritionList.innerHTML = '';
         const servingSize = parseFloat(servingSizeInput.value);
         predictions.forEach(prediction => {
-            const nutrition = nutritionData[prediction.className.toLowerCase()];
+            const nutrition = nutritionData[prediction.class.toLowerCase()];
             if (nutrition) {
                 const li = document.createElement('li');
-                li.textContent = `${prediction.className}: Calories - ${nutrition.calories * servingSize}`;
+                li.textContent = `${prediction.class}: Calories - ${nutrition.calories * servingSize}`;
                 nutritionList.appendChild(li);
             }
         });
@@ -189,7 +184,7 @@
     function suggestRecipes(predictions) {
         recipeList.innerHTML = '';
         predictions.forEach(prediction => {
-            const recipes = recipeData[prediction.className.toLowerCase()];
+            const recipes = recipeData[prediction.class.toLowerCase()];
             if (recipes) {
                 recipes.forEach(recipe => {
                     const li = document.createElement('li');
@@ -203,14 +198,14 @@
     function updateDetectionHistory(predictions) {
         predictions.forEach(prediction => {
             const li = document.createElement('li');
-            li.textContent = prediction.className;
+            li.textContent = prediction.class;
             historyList.appendChild(li);
         });
     }
 
     function updateCalorieTracker(predictions) {
         predictions.forEach(prediction => {
-            const nutrition = nutritionData[prediction.className.toLowerCase()];
+            const nutrition = nutritionData[prediction.class.toLowerCase()];
             if (nutrition) {
                 calorieCount += nutrition.calories;
                 totalCalories.textContent = calorieCount;
@@ -220,14 +215,14 @@
 
     function speakDetectedItems(predictions) {
         const utterance = new SpeechSynthesisUtterance();
-        utterance.lang = document.getElementById('languageSelect').value;
-        utterance.text = "Detected items: " + predictions.map(pred => pred.className).join(", ");
+        utterance.lang = 'te-IN';  // Telugu language code
+        utterance.text = " గుర్తించిన అంశాలు: " + predictions.map(pred => pred.class).join(", ");
         speechSynthesis.speak(utterance);
     }
 
-    document.getElementById('takePhotoButton').addEventListener('click', takePhoto);
+    document.getElementById('takePhotoButton').addEventListener('click', captureAndDetect);
     startCamera();
-    loadModel();
+    setupObjectDetector();
 </script>
 
 </body>
