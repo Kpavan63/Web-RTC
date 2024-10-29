@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enhanced Food AI Assistant</title>
+    <title>Enhanced Food AI Assistant with Bounding Boxes</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -68,9 +68,13 @@
 </head>
 <body>
 
-<header>Enhanced Food AI Assistant</header>
+<header>Enhanced Food AI Assistant with Bounding Boxes</header>
 
 <div class="container">
+    <select id="languageSelect" class="btn">
+        <option value="en">English</option>
+        <option value="te">Telugu</option>
+    </select>
     <button class="btn" id="takePhotoButton">Take Photo</button>
     <video id="videoInput" autoplay playsinline></video>
     <canvas id="canvasOutput"></canvas>
@@ -150,25 +154,43 @@
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
         const predictions = await objectDetector.detect(canvas);
-        displayResults(predictions);
-        updateNutritionInfo(predictions);
+        objectList.innerHTML = '';
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        predictions.forEach(prediction => {
+            ctx.strokeStyle = 'red';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(
+                prediction.bbox[0],
+                prediction.bbox[1],
+                prediction.bbox[2],
+                prediction.bbox[3]
+            );
+
+            ctx.fillStyle = 'red';
+            ctx.font = '16px Arial';
+            ctx.fillText(
+                `${prediction.class} (${(prediction.score * 100).toFixed(2)}%)`,
+                prediction.bbox[0],
+                prediction.bbox[1] > 10 ? prediction.bbox[1] - 5 : 10
+            );
+
+            const li = document.createElement('li');
+            li.textContent = `${prediction.class} (${(prediction.score * 100).toFixed(2)}%)`;
+            objectList.appendChild(li);
+        });
+
+        displayNutritionInfo(predictions);
         suggestRecipes(predictions);
         updateDetectionHistory(predictions);
         updateCalorieTracker(predictions);
         speakDetectedItems(predictions);
     }
 
-    function displayResults(predictions) {
-        objectList.innerHTML = '';
-        predictions.forEach(prediction => {
-            const li = document.createElement('li');
-            li.textContent = `${prediction.class} (${(prediction.score * 100).toFixed(2)}%)`;
-            objectList.appendChild(li);
-        });
-    }
-
-    function updateNutritionInfo(predictions) {
+    function displayNutritionInfo(predictions) {
         nutritionList.innerHTML = '';
         const servingSize = parseFloat(servingSizeInput.value);
         predictions.forEach(prediction => {
@@ -215,8 +237,8 @@
 
     function speakDetectedItems(predictions) {
         const utterance = new SpeechSynthesisUtterance();
-        utterance.lang = 'te-IN';  // Telugu language code
-        utterance.text = " గుర్తించిన అంశాలు: " + predictions.map(pred => pred.class).join(", ");
+        utterance.lang = document.getElementById('languageSelect').value === "te" ? "te-IN" : "en-US";
+        utterance.text = "Detected items: " + predictions.map(pred => pred.class).join(", ");
         speechSynthesis.speak(utterance);
     }
 
